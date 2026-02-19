@@ -91,7 +91,7 @@ class GitHubService:
             logger.error(f"Issues 조회 실패 ({repo_name}): {e}")
             return []
 
-    def get_recent_commits(self, repo_name: str, since: datetime = None) -> list[dict]:
+    def get_recent_commits(self, repo_name: str, since: datetime = None, max_count: int = 50) -> list[dict]:
         """저장소의 최근 커밋 조회"""
         try:
             repo = self.client.get_repo(f"{settings.github_org}/{repo_name}")
@@ -101,7 +101,10 @@ class GitHubService:
 
             commits = repo.get_commits(**kwargs)
             result = []
-            for commit in commits[:50]:
+            count = 0
+            for commit in commits:
+                if count >= max_count:
+                    break
                 result.append({
                     "sha": commit.sha[:8],
                     "message": commit.commit.message,
@@ -109,11 +112,16 @@ class GitHubService:
                     "date": commit.commit.author.date if commit.commit.author else None,
                     "url": commit.html_url,
                 })
+                count += 1
 
             return result
 
         except GithubException as e:
-            logger.error(f"커밋 조회 실패 ({repo_name}): {e}")
+            if e.status == 409:
+                # Empty repository
+                logger.debug(f"빈 저장소 건너뜀: {repo_name}")
+            else:
+                logger.error(f"커밋 조회 실패 ({repo_name}): {e}")
             return []
 
     def _classify_issue(self, labels: list[str]) -> ItemCategory:

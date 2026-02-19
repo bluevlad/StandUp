@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class TobeAgent:
     """진행사항 추적 Agent"""
 
+    # 초기 스캔 범위: 14일, 이후 정기 스캔: 1시간
+    INITIAL_SCAN_DAYS = 14
+    REGULAR_SCAN_HOURS = 1
+
     def run(self):
         """Agent 실행 (스케줄러에서 호출)"""
         logger.info("=== Auto-Tobe-Agent 실행 시작 ===")
@@ -29,9 +33,18 @@ class TobeAgent:
 
         db = SessionLocal()
         try:
-            repos = github.get_org_repos()
-            since = datetime.now() - timedelta(hours=1)
+            # 진행사항(커밋 기반)이 없으면 초기 스캔 (14일), 있으면 정기 (1시간)
+            commit_items = db.query(WorkItem).filter(
+                WorkItem.related_commits.isnot(None)
+            ).count()
+            if commit_items == 0:
+                since = datetime.now() - timedelta(days=self.INITIAL_SCAN_DAYS)
+                logger.info(f"초기 스캔 모드: 최근 {self.INITIAL_SCAN_DAYS}일")
+            else:
+                since = datetime.now() - timedelta(hours=self.REGULAR_SCAN_HOURS)
+                logger.info(f"정기 스캔 모드: 최근 {self.REGULAR_SCAN_HOURS}시간")
 
+            repos = github.get_org_repos()
             total_tracked = 0
 
             for repo in repos:

@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 class QAAgent:
     """GitHub Issues 자동 검수 Agent"""
 
+    # 초기 스캔 범위: 30일, 이후 정기 스캔: 2시간
+    INITIAL_SCAN_DAYS = 30
+    REGULAR_SCAN_HOURS = 2
+
     def run(self):
         """Agent 실행 (스케줄러에서 호출)"""
         logger.info("=== Autonomous-QA-Agent 실행 시작 ===")
@@ -29,9 +33,16 @@ class QAAgent:
 
         db = SessionLocal()
         try:
-            repos = github.get_org_repos()
-            since = datetime.now() - timedelta(hours=2)
+            # DB에 데이터가 없으면 초기 스캔 (30일), 있으면 정기 스캔 (2시간)
+            existing_count = db.query(WorkItem).count()
+            if existing_count == 0:
+                since = datetime.now() - timedelta(days=self.INITIAL_SCAN_DAYS)
+                logger.info(f"초기 스캔 모드: 최근 {self.INITIAL_SCAN_DAYS}일")
+            else:
+                since = datetime.now() - timedelta(hours=self.REGULAR_SCAN_HOURS)
+                logger.info(f"정기 스캔 모드: 최근 {self.REGULAR_SCAN_HOURS}시간")
 
+            repos = github.get_org_repos()
             total_new = 0
             total_updated = 0
 
