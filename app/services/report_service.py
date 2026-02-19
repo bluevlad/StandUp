@@ -3,13 +3,14 @@
 """
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ..core.config import settings
-from ..models.issue import WorkItem, ItemCategory
+from ..models.issue import WorkItem, ItemCategory, ItemStatus
 from ..models.report import Report, ReportItem, ReportType, ReportStatus
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,37 @@ _jinja_env = Environment(
     loader=FileSystemLoader(str(_template_dir)),
     autoescape=select_autoescape(["html"]),
 )
+
+
+def _group_by_project(items, max_projects, max_items):
+    """항목을 프로젝트별로 그룹핑하고 상위 N건만 추출"""
+    by_repo = defaultdict(list)
+    for item in items:
+        by_repo[item.github_repo].append(item)
+
+    # 건수 내림차순 정렬
+    sorted_repos = sorted(by_repo.items(), key=lambda x: len(x[1]), reverse=True)
+
+    visible_groups = []
+    for repo, repo_items in sorted_repos[:max_projects]:
+        visible_groups.append({
+            "repo": repo,
+            "total_count": len(repo_items),
+            "top_items": repo_items[:max_items],
+            "remaining_count": max(0, len(repo_items) - max_items),
+        })
+
+    hidden_repos = sorted_repos[max_projects:]
+    hidden_projects_count = len(hidden_repos)
+    hidden_items_count = sum(len(repo_items) for _, repo_items in hidden_repos)
+
+    return {
+        "groups": visible_groups,
+        "total_count": len(items),
+        "hidden_projects_count": hidden_projects_count,
+        "hidden_items_count": hidden_items_count,
+        "project_count": len(sorted_repos),
+    }
 
 
 class ReportService:
@@ -82,6 +114,9 @@ class ReportService:
         template_name: str,
     ) -> Report:
         """보고서 공통 생성 로직"""
+        max_projects = settings.max_projects_per_category
+        max_items = settings.max_items_per_project
+
         # 기간 내 업무 항목 조회
         items = (
             db.query(WorkItem)
@@ -91,10 +126,24 @@ class ReportService:
             .all()
         )
 
-        # 분류별 그룹핑
+        # 분류별 분리
         planned = [i for i in items if i.category == ItemCategory.PLANNED]
         required = [i for i in items if i.category == ItemCategory.REQUIRED]
         in_progress = [i for i in items if i.category == ItemCategory.IN_PROGRESS]
+
+        # 프로젝트별 그룹핑
+        planned_grouped = _group_by_project(planned, max_projects, max_items)
+        required_grouped = _group_by_project(required, max_projects, max_items)
+        progress_grouped = _group_by_project(in_progress, max_projects, max_items)
+
+        # 완료 건수
+        resolved_count = sum(
+            1 for i in items
+            if i.status in (ItemStatus.RESOLVED, ItemStatus.CLOSED)
+        )
+
+        # 전체 프로젝트 수
+        all_repos = set(i.github_repo for i in items)
 
         # HTML 렌더링
         template = _jinja_env.get_template(template_name)
@@ -102,9 +151,12 @@ class ReportService:
             report_type=report_type.value,
             period_start=period_start,
             period_end=period_end,
-            planned_items=planned,
-            required_items=required,
-            in_progress_items=in_progress,
+            total_count=len(items),
+            project_count=len(all_repos),
+            resolved_count=resolved_count,
+            planned=planned_grouped,
+            required=required_grouped,
+            in_progress=progress_grouped,
             generated_at=datetime.now(),
         )
 

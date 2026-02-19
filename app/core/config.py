@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     monthly_report_hour: int = Field(default=11, env="MONTHLY_REPORT_HOUR")
     monthly_report_minute: int = Field(default=0, env="MONTHLY_REPORT_MINUTE")
 
+    # Newsletter report display
+    max_projects_per_category: int = Field(default=5, env="MAX_PROJECTS_PER_CATEGORY")
+    max_items_per_project: int = Field(default=3, env="MAX_ITEMS_PER_PROJECT")
+
     # 로깅
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
 
