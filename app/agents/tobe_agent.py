@@ -3,6 +3,8 @@ Auto-Tobe-Agent
 Git Issues 조치사항 및 Commit 고도화 내용을 진행사항으로 정리 등록
 """
 
+import re
+import time
 import logging
 from datetime import datetime, timedelta
 
@@ -11,20 +13,29 @@ from sqlalchemy.orm import Session
 from ..core.database import SessionLocal
 from ..services.github_service import get_github_service
 from ..models.issue import WorkItem, ItemCategory, ItemStatus
+from ..models.agent_log import AgentLog
 
 logger = logging.getLogger(__name__)
+
+# Issue 번호 추출 패턴
+_ISSUE_PATTERNS = [
+    re.compile(r"#(\d+)"),
+    re.compile(r"[Cc]loses?\s+#(\d+)"),
+    re.compile(r"[Ff]ixes?\s+#(\d+)"),
+    re.compile(r"[Rr]esolves?\s+#(\d+)"),
+]
 
 
 class TobeAgent:
     """진행사항 추적 Agent"""
 
-    # 초기 스캔 범위: 14일, 이후 정기 스캔: 1시간
     INITIAL_SCAN_DAYS = 14
     REGULAR_SCAN_HOURS = 1
 
     def run(self):
         """Agent 실행 (스케줄러에서 호출)"""
         logger.info("=== Auto-Tobe-Agent 실행 시작 ===")
+        start_time = time.time()
 
         github = get_github_service()
         if not github.is_configured:
@@ -33,7 +44,6 @@ class TobeAgent:
 
         db = SessionLocal()
         try:
-            # 진행사항(커밋 기반)이 없으면 초기 스캔 (14일), 있으면 정기 (1시간)
             commit_items = db.query(WorkItem).filter(
                 WorkItem.related_commits.isnot(None)
             ).count()
@@ -51,9 +61,37 @@ class TobeAgent:
                 tracked = self._track_progress(db, github, repo["name"], since)
                 total_tracked += tracked
 
-            logger.info(f"=== Tobe-Agent 완료: 추적 {total_tracked}건 ===")
+            duration = time.time() - start_time
+            logger.info(
+                f"=== Tobe-Agent 완료: 추적 {total_tracked}건 ({duration:.1f}초) ==="
+            )
+
+            log = AgentLog(
+                agent_name="Tobe-Agent",
+                action="commit_track",
+                status="success",
+                detail=f"추적 {total_tracked}건",
+                items_processed=total_tracked,
+                duration_seconds=round(duration, 2),
+            )
+            db.add(log)
+            db.commit()
+
         except Exception as e:
+            duration = time.time() - start_time
             logger.error(f"Tobe-Agent 오류: {e}", exc_info=True)
+            try:
+                log = AgentLog(
+                    agent_name="Tobe-Agent",
+                    action="commit_track",
+                    status="error",
+                    detail=str(e)[:1000],
+                    duration_seconds=round(duration, 2),
+                )
+                db.add(log)
+                db.commit()
+            except Exception:
+                pass
         finally:
             db.close()
 
@@ -67,7 +105,6 @@ class TobeAgent:
         for commit_data in commits:
             message = commit_data["message"].split("\n")[0]
 
-            # 이미 등록된 커밋인지 확인
             existing = (
                 db.query(WorkItem)
                 .filter(
@@ -79,7 +116,6 @@ class TobeAgent:
             if existing:
                 continue
 
-            # Issue 참조 커밋인 경우 해당 WorkItem 업데이트
             issue_number = self._extract_issue_number(commit_data["message"])
             if issue_number:
                 work_item = (
@@ -102,7 +138,6 @@ class TobeAgent:
                     tracked += 1
                     continue
 
-            # Issue 참조 없는 독립 커밋 → 진행사항으로 등록
             work_item = WorkItem(
                 github_repo=repo_name,
                 category=ItemCategory.IN_PROGRESS,
@@ -120,17 +155,11 @@ class TobeAgent:
 
         return tracked
 
-    def _extract_issue_number(self, commit_message: str) -> int | None:
+    @staticmethod
+    def _extract_issue_number(commit_message: str) -> int | None:
         """커밋 메시지에서 Issue 번호 추출"""
-        import re
-        patterns = [
-            r"#(\d+)",
-            r"[Cc]loses?\s+#(\d+)",
-            r"[Ff]ixes?\s+#(\d+)",
-            r"[Rr]esolves?\s+#(\d+)",
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, commit_message)
+        for pattern in _ISSUE_PATTERNS:
+            match = pattern.search(commit_message)
             if match:
                 return int(match.group(1))
         return None

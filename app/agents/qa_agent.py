@@ -3,6 +3,7 @@ Autonomous-QA-Agent
 주기적으로 GitHub Issues를 검수하여 예정사항/요구사항으로 분류 등록
 """
 
+import time
 import logging
 from datetime import datetime, timedelta
 
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..core.database import SessionLocal
 from ..services.github_service import get_github_service
 from ..models.issue import WorkItem, ItemCategory, ItemStatus
+from ..models.agent_log import AgentLog
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +20,13 @@ logger = logging.getLogger(__name__)
 class QAAgent:
     """GitHub Issues 자동 검수 Agent"""
 
-    # 초기 스캔 범위: 30일, 이후 정기 스캔: 2시간
     INITIAL_SCAN_DAYS = 30
     REGULAR_SCAN_HOURS = 2
 
     def run(self):
         """Agent 실행 (스케줄러에서 호출)"""
         logger.info("=== Autonomous-QA-Agent 실행 시작 ===")
+        start_time = time.time()
 
         github = get_github_service()
         if not github.is_configured:
@@ -33,7 +35,6 @@ class QAAgent:
 
         db = SessionLocal()
         try:
-            # DB에 데이터가 없으면 초기 스캔 (30일), 있으면 정기 스캔 (2시간)
             existing_count = db.query(WorkItem).count()
             if existing_count == 0:
                 since = datetime.now() - timedelta(days=self.INITIAL_SCAN_DAYS)
@@ -51,11 +52,39 @@ class QAAgent:
                 total_new += new
                 total_updated += updated
 
+            duration = time.time() - start_time
             logger.info(
-                f"=== QA-Agent 완료: 신규 {total_new}건, 갱신 {total_updated}건 ==="
+                f"=== QA-Agent 완료: 신규 {total_new}건, 갱신 {total_updated}건 "
+                f"({duration:.1f}초) ==="
             )
+
+            # 실행 이력 기록
+            log = AgentLog(
+                agent_name="QA-Agent",
+                action="issues_scan",
+                status="success",
+                detail=f"신규 {total_new}건, 갱신 {total_updated}건",
+                items_processed=total_new + total_updated,
+                duration_seconds=round(duration, 2),
+            )
+            db.add(log)
+            db.commit()
+
         except Exception as e:
+            duration = time.time() - start_time
             logger.error(f"QA-Agent 오류: {e}", exc_info=True)
+            try:
+                log = AgentLog(
+                    agent_name="QA-Agent",
+                    action="issues_scan",
+                    status="error",
+                    detail=str(e)[:1000],
+                    duration_seconds=round(duration, 2),
+                )
+                db.add(log)
+                db.commit()
+            except Exception:
+                pass
         finally:
             db.close()
 
