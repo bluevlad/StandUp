@@ -23,7 +23,7 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
           GH_TOKEN_VAL: ${{ secrets.GH_TOKEN }}
-          GITHUB_ORG: ${{ secrets.GITHUB_ORG }}
+          GH_ORG_VAL: ${{ secrets.GH_ORG }}
           DAILY_REPORT_HOUR: ${{ secrets.DAILY_REPORT_HOUR }}
           DAILY_REPORT_MINUTE: ${{ secrets.DAILY_REPORT_MINUTE }}
           WEEKLY_REPORT_HOUR: ${{ secrets.WEEKLY_REPORT_HOUR }}
@@ -38,7 +38,7 @@ jobs:
           GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
           REPORT_RECIPIENTS=${REPORT_RECIPIENTS}
           GITHUB_TOKEN=${GH_TOKEN_VAL}
-          GITHUB_ORG=${GITHUB_ORG}
+          GITHUB_ORG=${GH_ORG_VAL}
           DAILY_REPORT_HOUR=${DAILY_REPORT_HOUR:-17}
           DAILY_REPORT_MINUTE=${DAILY_REPORT_MINUTE:-0}
           WEEKLY_REPORT_HOUR=${WEEKLY_REPORT_HOUR:-10}
