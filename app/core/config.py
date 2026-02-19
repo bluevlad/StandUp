@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # 데이터베이스
     database_url: str = Field(
-        default="postgresql://postgres:postgres123@172.30.1.72:5432/standup_dev",
+        default="postgresql://localhost:5432/standup",
         env="DATABASE_URL"
     )
 
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     # GitHub
     github_token: str = Field(default="", env="GITHUB_TOKEN")
-    github_org: str = Field(default="bluevlad", env="GITHUB_ORG")
+    github_org: str = Field(default="", env="GITHUB_ORG")
 
     # 스케줄러 - 일일보고 (매일 17:00)
     daily_report_hour: int = Field(default=17, env="DAILY_REPORT_HOUR")

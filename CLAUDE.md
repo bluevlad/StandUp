@@ -4,10 +4,10 @@
 Git Issues 기반 업무 수집, 분류, 보고서 자동 생성/발송 시스템
 
 ## Environment
-- DB: PostgreSQL 15 (172.30.1.72:5432)
+- DB: PostgreSQL 15 (별도 서버, .env로 관리)
   - Production: `standup`
   - Development: `standup_dev`
-- Docker: DB-first (DB는 운영 MacBook, 앱은 로컬 실행)
+- Docker: DB-first (DB는 별도 서버, 앱은 Docker 실행)
 - Python: 3.11+
 
 ## Tech Stack
@@ -54,7 +54,7 @@ app/
 - Oracle 문법 사용 금지 (NVL, SYSDATE, ROWNUM 등)
 - .env 파일을 git에 커밋 금지
 - docker-compose.production.yml을 개발 PC에서 수정 금지
-- 172.30.1.72 운영 DB에 직접 DDL 실행 금지
+- 운영 DB에 직접 DDL 실행 금지
 
 ## Database Notes
 - PostgreSQL 전용: COALESCE, NOW(), LIMIT/OFFSET 사용
