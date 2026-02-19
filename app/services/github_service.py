@@ -2,6 +2,7 @@
 GitHub API 연동 서비스
 """
 
+import re
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -12,6 +13,15 @@ from ..core.config import settings
 from ..models.issue import ItemCategory
 
 logger = logging.getLogger(__name__)
+
+_UNICODE_ESCAPE_RE = re.compile(r'\\u([0-9a-fA-F]{4})')
+
+
+def _decode_unicode_escapes(text: str) -> str:
+    """Decode literal \\uXXXX escape sequences to actual unicode characters"""
+    if not text or "\\u" not in text:
+        return text
+    return _UNICODE_ESCAPE_RE.sub(lambda m: chr(int(m.group(1), 16)), text)
 
 
 class GitHubService:
@@ -74,8 +84,8 @@ class GitHubService:
 
                 result.append({
                     "number": issue.number,
-                    "title": issue.title,
-                    "body": issue.body or "",
+                    "title": _decode_unicode_escapes(issue.title),
+                    "body": _decode_unicode_escapes(issue.body or ""),
                     "state": issue.state,
                     "labels": labels,
                     "category": category,
@@ -107,7 +117,7 @@ class GitHubService:
                     break
                 result.append({
                     "sha": commit.sha[:8],
-                    "message": commit.commit.message,
+                    "message": _decode_unicode_escapes(commit.commit.message),
                     "author": commit.commit.author.name if commit.commit.author else "unknown",
                     "date": commit.commit.author.date if commit.commit.author else None,
                     "url": commit.html_url,
