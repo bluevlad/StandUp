@@ -1,0 +1,75 @@
+name: Deploy StandUp
+
+on:
+  push:
+    branches:
+      - prod
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: prod
+
+      - name: Create .env.production from secrets
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
+          GH_TOKEN_VAL: ${{ secrets.GH_TOKEN }}
+          GITHUB_ORG: ${{ secrets.GITHUB_ORG }}
+          DAILY_REPORT_HOUR: ${{ secrets.DAILY_REPORT_HOUR }}
+          DAILY_REPORT_MINUTE: ${{ secrets.DAILY_REPORT_MINUTE }}
+          WEEKLY_REPORT_HOUR: ${{ secrets.WEEKLY_REPORT_HOUR }}
+          WEEKLY_REPORT_MINUTE: ${{ secrets.WEEKLY_REPORT_MINUTE }}
+          MONTHLY_REPORT_HOUR: ${{ secrets.MONTHLY_REPORT_HOUR }}
+          MONTHLY_REPORT_MINUTE: ${{ secrets.MONTHLY_REPORT_MINUTE }}
+          LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
+        run: |
+          cat > .env.production << EOF
+          DATABASE_URL=${DATABASE_URL}
+          GMAIL_ADDRESS=${GMAIL_ADDRESS}
+          GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
+          REPORT_RECIPIENTS=${REPORT_RECIPIENTS}
+          GITHUB_TOKEN=${GH_TOKEN_VAL}
+          GITHUB_ORG=${GITHUB_ORG}
+          DAILY_REPORT_HOUR=${DAILY_REPORT_HOUR:-17}
+          DAILY_REPORT_MINUTE=${DAILY_REPORT_MINUTE:-0}
+          WEEKLY_REPORT_HOUR=${WEEKLY_REPORT_HOUR:-10}
+          WEEKLY_REPORT_MINUTE=${WEEKLY_REPORT_MINUTE:-0}
+          MONTHLY_REPORT_HOUR=${MONTHLY_REPORT_HOUR:-11}
+          MONTHLY_REPORT_MINUTE=${MONTHLY_REPORT_MINUTE:-0}
+          LOG_LEVEL=${LOG_LEVEL:-INFO}
+          API_PORT=9060
+          EOF
+
+      - name: Run deploy script
+        run: |
+          chmod +x scripts/deploy.sh
+          ./scripts/deploy.sh
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for container to start..."
+          sleep 15
+          for i in 1 2 3 4 5; do
+            if curl -sf http://localhost:9060/api/v1/health > /dev/null 2>&1; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 5s..."
+            sleep 5
+          done
+          echo "Health check failed after 5 attempts"
+          docker logs standup-app --tail 50
+          exit 1
+
+      - name: Cleanup .env.production
+        if: always()
+        run: rm -f .env.production
