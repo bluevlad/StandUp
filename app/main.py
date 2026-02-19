@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="StandUp",
     description="업무관리 자동화 Agent - Git Issues 기반 업무 수집/분류/보고서 자동 생성",
-    version="0.2.0",
+    version="0.2.1",
     lifespan=lifespan,
 )
 
@@ -55,6 +55,6 @@ app.include_router(work_items.router, prefix="/api/v1")
 def root():
     return {
         "service": "StandUp",
-        "version": "0.2.0",
+        "version": "0.2.1",
         "docs": "/docs",
     }
