@@ -31,8 +31,10 @@ class GitHubService:
     PLANNED_LABELS = {"enhancement", "feature", "refactor", "improvement", "planned"}
     REQUIRED_LABELS = {"bug", "request", "urgent", "hotfix", "required"}
 
-    def __init__(self, token: str = None):
+    def __init__(self, token: str = None, org_name: str = None, base_url: str = None):
         self.token = token or settings.github_token
+        self.org_name = org_name or settings.github_org
+        self.base_url = base_url
         self._client: Optional[Github] = None
 
     @property
@@ -40,7 +42,10 @@ class GitHubService:
         if self._client is None:
             if not self.token:
                 raise ValueError("GITHUB_TOKEN이 설정되지 않았습니다.")
-            self._client = Github(self.token)
+            if self.base_url:
+                self._client = Github(base_url=self.base_url, login_or_token=self.token)
+            else:
+                self._client = Github(self.token)
         return self._client
 
     @property
@@ -50,7 +55,7 @@ class GitHubService:
     def get_org_repos(self) -> list[dict]:
         """조직의 전체 저장소 목록 조회"""
         try:
-            user = self.client.get_user(settings.github_org)
+            user = self.client.get_user(self.org_name)
             repos = user.get_repos()
             return [
                 {
@@ -68,7 +73,7 @@ class GitHubService:
     def get_issues(self, repo_name: str, since: datetime = None, state: str = "all") -> list[dict]:
         """저장소의 Issues 조회"""
         try:
-            repo = self.client.get_repo(f"{settings.github_org}/{repo_name}")
+            repo = self.client.get_repo(f"{self.org_name}/{repo_name}")
             kwargs = {"state": state, "sort": "updated", "direction": "desc"}
             if since:
                 kwargs["since"] = since
@@ -104,7 +109,7 @@ class GitHubService:
     def get_recent_commits(self, repo_name: str, since: datetime = None, max_count: int = 50) -> list[dict]:
         """저장소의 최근 커밋 조회"""
         try:
-            repo = self.client.get_repo(f"{settings.github_org}/{repo_name}")
+            repo = self.client.get_repo(f"{self.org_name}/{repo_name}")
             kwargs = {}
             if since:
                 kwargs["since"] = since
@@ -146,7 +151,16 @@ class GitHubService:
         return ItemCategory.PLANNED
 
 
-# 싱글톤
+def create_github_service_from_provider(provider) -> GitHubService:
+    """GitProvider 엔티티로부터 GitHubService 생성"""
+    return GitHubService(
+        token=provider.token,
+        org_name=provider.org_name,
+        base_url=provider.base_url,
+    )
+
+
+# 싱글톤 (.env 기반 기본 서비스)
 _service: Optional[GitHubService] = None
 
 

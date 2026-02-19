@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from ..core.database import SessionLocal
-from ..services.github_service import get_github_service
+from ..services.github_service import get_github_service, create_github_service_from_provider
+from ..services import config_service
 from ..models.issue import WorkItem, ItemCategory, ItemStatus
 from ..models.agent_log import AgentLog
 
@@ -28,11 +29,6 @@ class QAAgent:
         logger.info("=== Autonomous-QA-Agent 실행 시작 ===")
         start_time = time.time()
 
-        github = get_github_service()
-        if not github.is_configured:
-            logger.warning("GitHub 토큰 미설정. QA-Agent 건너뜀.")
-            return
-
         db = SessionLocal()
         try:
             existing_count = db.query(WorkItem).count()
@@ -43,14 +39,42 @@ class QAAgent:
                 since = datetime.now() - timedelta(hours=self.REGULAR_SCAN_HOURS)
                 logger.info(f"정기 스캔 모드: 최근 {self.REGULAR_SCAN_HOURS}시간")
 
-            repos = github.get_org_repos()
             total_new = 0
             total_updated = 0
 
-            for repo in repos:
-                new, updated = self._scan_repo(db, github, repo["name"], since)
-                total_new += new
-                total_updated += updated
+            # DB에 git_providers가 있으면 등록된 리포만 스캔
+            providers = config_service.get_active_git_providers(db)
+            if providers:
+                for provider in providers:
+                    github = create_github_service_from_provider(provider)
+                    if not github.is_configured:
+                        continue
+                    repos = config_service.get_active_repositories(db, provider.id)
+                    if repos:
+                        # 등록된 리포만 스캔
+                        for repo in repos:
+                            new, updated = self._scan_repo(db, github, repo.repo_name, since)
+                            total_new += new
+                            total_updated += updated
+                    else:
+                        # 리포 등록 없으면 조직 전체 스캔
+                        org_repos = github.get_org_repos()
+                        for repo in org_repos:
+                            new, updated = self._scan_repo(db, github, repo["name"], since)
+                            total_new += new
+                            total_updated += updated
+            else:
+                # .env fallback: 기존 방식
+                github = get_github_service()
+                if not github.is_configured:
+                    logger.warning("GitHub 토큰 미설정. QA-Agent 건너뜀.")
+                    return
+
+                repos = github.get_org_repos()
+                for repo in repos:
+                    new, updated = self._scan_repo(db, github, repo["name"], since)
+                    total_new += new
+                    total_updated += updated
 
             duration = time.time() - start_time
             logger.info(

@@ -6,10 +6,10 @@ Report-Agent
 import logging
 from datetime import datetime
 
-from ..core.config import settings
 from ..core.database import SessionLocal
 from ..services.report_service import get_report_service
-from ..services.email_service import get_email_service
+from ..services.email_service import get_email_service, get_email_service_with_config
+from ..services import config_service
 from ..models.report import Report, ReportStatus
 
 logger = logging.getLogger(__name__)
@@ -59,8 +59,9 @@ class ReportAgent:
 
     def _send_report(self, db, report: Report):
         """보고서 이메일 발송"""
-        email_service = get_email_service()
-        recipients = settings.recipient_list
+        # DB에서 수신자 조회 (DB → .env fallback)
+        report_type = report.report_type.value.lower()
+        recipients = config_service.get_active_recipients(db, report_type)
 
         if not recipients:
             logger.warning("이메일 수신자가 설정되지 않았습니다.")
@@ -68,6 +69,15 @@ class ReportAgent:
             report.error_message = "수신자 미설정"
             db.commit()
             return
+
+        # DB에서 Gmail 설정 조회 (DB → .env fallback)
+        gmail_config = config_service.get_gmail_config(db)
+        if gmail_config["address"] and gmail_config["password"]:
+            email_service = get_email_service_with_config(
+                gmail_config["address"], gmail_config["password"]
+            )
+        else:
+            email_service = get_email_service()
 
         if not email_service.is_configured:
             logger.warning("이메일 서비스가 설정되지 않았습니다.")

@@ -12,7 +12,7 @@ from .core.config import settings
 from .core.database import engine, Base
 from .core.logging_config import setup_logging
 from .core.scheduler import setup_scheduler, shutdown_scheduler
-from .api.v1.endpoints import health, reports, work_items
+from .api.v1.endpoints import health, reports, work_items, config
 
 # 로깅 설정 (파일 + 콘솔)
 setup_logging()
@@ -25,7 +25,10 @@ async def lifespan(app: FastAPI):
     logger.info("StandUp Agent 시작 (port: %d)", settings.api_port)
 
     # DB 테이블 자동 생성
-    from .models import WorkItem, Report, ReportItem, AgentLog  # noqa: F401
+    from .models import (  # noqa: F401
+        WorkItem, Report, ReportItem, AgentLog,
+        GitProvider, Repository, Recipient, AppSetting,
+    )
     Base.metadata.create_all(bind=engine)
     logger.info("DB 테이블 확인 완료")
 
@@ -41,7 +44,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="StandUp",
     description="업무관리 자동화 Agent - Git Issues 기반 업무 수집/분류/보고서 자동 생성",
-    version="0.2.1",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
@@ -49,12 +52,13 @@ app = FastAPI(
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(reports.router, prefix="/api/v1")
 app.include_router(work_items.router, prefix="/api/v1")
+app.include_router(config.router, prefix="/api/v1")
 
 
 @app.get("/")
 def root():
     return {
         "service": "StandUp",
-        "version": "0.2.1",
+        "version": "0.3.0",
         "docs": "/docs",
     }

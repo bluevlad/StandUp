@@ -13,7 +13,10 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import Base
-from app.models import WorkItem, Report, ReportItem, AgentLog  # noqa: F401
+from app.models import (  # noqa: F401
+    WorkItem, Report, ReportItem, AgentLog,
+    GitProvider, ProviderType, Repository, Recipient, AppSetting,
+)
 
 config = context.config
 

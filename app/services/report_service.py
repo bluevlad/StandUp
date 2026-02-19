@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from ..core.config import settings
 from ..models.issue import WorkItem, ItemCategory, ItemStatus
 from ..models.report import Report, ReportItem, ReportType, ReportStatus
+from ..services import config_service
 
 logger = logging.getLogger(__name__)
 
@@ -114,8 +115,13 @@ class ReportService:
         template_name: str,
     ) -> Report:
         """보고서 공통 생성 로직"""
-        max_projects = settings.max_projects_per_category
-        max_items = settings.max_items_per_project
+        # DB-first, .env fallback
+        max_projects = config_service.get_setting_int(db, "max_projects_per_category", settings.max_projects_per_category)
+        max_items = config_service.get_setting_int(db, "max_items_per_project", settings.max_items_per_project)
+
+        # 수신자 조회 (DB → .env fallback)
+        recipients = config_service.get_active_recipients(db, report_type.value.lower())
+        recipients_str = ",".join(recipients)
 
         # 기간 내 업무 항목 조회
         items = (
@@ -167,7 +173,7 @@ class ReportService:
             period_start=period_start,
             period_end=period_end,
             subject=subject,
-            recipients=settings.report_recipients,
+            recipients=recipients_str,
             content_html=html_content,
         )
 

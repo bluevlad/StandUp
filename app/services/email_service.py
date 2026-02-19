@@ -127,3 +127,8 @@ def get_email_service() -> EmailService:
     if _service is None:
         _service = EmailService()
     return _service
+
+
+def get_email_service_with_config(sender: str, password: str) -> EmailService:
+    """지정된 설정으로 이메일 서비스 생성"""
+    return EmailService(sender_email=sender, app_password=password)
