@@ -1,0 +1,35 @@
+# StandUp - Work Management Auto Agent
+
+# Web Framework
+fastapi>=0.109.0
+uvicorn>=0.27.0
+python-multipart>=0.0.6
+
+# HTTP Client
+requests>=2.31.0
+httpx>=0.27.0
+
+# Database
+sqlalchemy>=2.0.25
+alembic>=1.13.1
+psycopg2-binary>=2.9.9
+
+# Scheduler
+apscheduler>=3.10.4
+
+# Email
+aiosmtplib>=3.0.1
+
+# Template
+jinja2>=3.1.3
+
+# Config
+python-dotenv>=1.0.0
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+
+# GitHub API
+PyGithub>=2.1.1
+
+# Utilities
+python-dateutil>=2.8.2

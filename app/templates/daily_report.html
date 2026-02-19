@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .header { background: #2563eb; color: #fff; padding: 24px 32px; }
+        .header h1 { margin: 0; font-size: 22px; }
+        .header .date { margin-top: 8px; font-size: 14px; opacity: 0.9; }
+        .content { padding: 32px; }
+        .section { margin-bottom: 28px; }
+        .section h2 { font-size: 16px; color: #1e40af; border-bottom: 2px solid #dbeafe; padding-bottom: 8px; margin-bottom: 16px; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-right: 6px; }
+        .badge-planned { background: #dbeafe; color: #1e40af; }
+        .badge-required { background: #fee2e2; color: #991b1b; }
+        .badge-progress { background: #dcfce7; color: #166534; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { background: #f8fafc; text-align: left; padding: 10px 12px; border-bottom: 2px solid #e2e8f0; color: #475569; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
+        tr:hover { background: #f8fafc; }
+        .empty { color: #94a3b8; font-style: italic; padding: 16px 0; }
+        .footer { background: #f8fafc; padding: 16px 32px; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
+        a { color: #2563eb; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>일일업무보고</h1>
+        <div class="date">{{ period_start.strftime('%Y년 %m월 %d일') }} 업무 현황</div>
+    </div>
+    <div class="content">
+        <div class="section">
+            <h2><span class="badge badge-planned">예정</span> 예정사항</h2>
+            {% if planned_items %}
+            <table>
+                <thead><tr><th>프로젝트</th><th>제목</th><th>상태</th></tr></thead>
+                <tbody>
+                {% for item in planned_items %}
+                <tr>
+                    <td>{{ item.github_repo }}</td>
+                    <td>{% if item.github_issue_url %}<a href="{{ item.github_issue_url }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}</td>
+                    <td>{{ item.status.value }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">등록된 예정사항이 없습니다.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h2><span class="badge badge-required">요구</span> 요구사항</h2>
+            {% if required_items %}
+            <table>
+                <thead><tr><th>프로젝트</th><th>제목</th><th>상태</th></tr></thead>
+                <tbody>
+                {% for item in required_items %}
+                <tr>
+                    <td>{{ item.github_repo }}</td>
+                    <td>{% if item.github_issue_url %}<a href="{{ item.github_issue_url }}">{{ item.title }}</a>{% else %}{{ item.title }}{% endif %}</td>
+                    <td>{{ item.status.value }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">등록된 요구사항이 없습니다.</p>
+            {% endif %}
+        </div>
+
+        <div class="section">
+            <h2><span class="badge badge-progress">진행</span> 진행사항</h2>
+            {% if in_progress_items %}
+            <table>
+                <thead><tr><th>프로젝트</th><th>제목</th><th>커밋</th></tr></thead>
+                <tbody>
+                {% for item in in_progress_items %}
+                <tr>
+                    <td>{{ item.github_repo }}</td>
+                    <td>{{ item.title }}</td>
+                    <td>{{ item.related_commits[:40] if item.related_commits else '-' }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty">등록된 진행사항이 없습니다.</p>
+            {% endif %}
+        </div>
+    </div>
+    <div class="footer">
+        StandUp - 업무관리 자동화 Agent | 생성: {{ generated_at.strftime('%Y-%m-%d %H:%M') }}
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  standup:
+    build: .
+    container_name: standup-app
+    ports:
+      - "9060:9060"
+    env_file:
+      - .env.production
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+    name: unmong-network
