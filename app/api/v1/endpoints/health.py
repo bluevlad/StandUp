@@ -2,12 +2,11 @@
 헬스체크 및 모니터링 엔드포인트
 """
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from ....core.config import APP_VERSION, now_kst
 from ....core.database import get_db
 from ....core.scheduler import scheduler
 from ....models.issue import WorkItem, ItemCategory
@@ -29,8 +28,8 @@ def health_check(db: Session = Depends(get_db)):
     return {
         "status": "ok",
         "service": "StandUp",
-        "version": "0.2.0",
-        "timestamp": datetime.now().isoformat(),
+        "version": APP_VERSION,
+        "timestamp": now_kst().isoformat(),
         "database": {
             "work_items": work_item_count,
             "reports": report_count,
@@ -98,7 +97,7 @@ def report_diagnosis(db: Session = Depends(get_db)):
                 })
 
     # 6. 오늘 WorkItem 수
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = now_kst().replace(hour=0, minute=0, second=0, microsecond=0)
     today_items = db.query(func.count(WorkItem.id)).filter(
         WorkItem.updated_at >= today_start
     ).scalar()
@@ -113,14 +112,23 @@ def report_diagnosis(db: Session = Depends(get_db)):
     if today_items == 0:
         issues.append("오늘 업데이트된 WorkItem 0건 (빈 보고서 발송 가능)")
 
+    def _mask_email(email: str) -> str:
+        """이메일 마스킹: user@domain.com → us***@domain.com"""
+        if "@" not in email:
+            return "***"
+        local, domain = email.split("@", 1)
+        return f"{local[:2]}***@{domain}" if len(local) > 2 else f"{local[0]}***@{domain}"
+
     return {
         "status": "ok" if not issues else "warning",
         "issues": issues,
         "gmail_configured": gmail_ok or email_service.is_configured,
         "gmail_address": gmail_config["address"][:3] + "***" if gmail_config["address"] else "",
         "recipients": {
-            "daily": daily_recipients,
-            "weekly": weekly_recipients,
+            "daily": [_mask_email(e) for e in daily_recipients],
+            "weekly": [_mask_email(e) for e in weekly_recipients],
+            "daily_count": len(daily_recipients),
+            "weekly_count": len(weekly_recipients),
         },
         "scheduler_report_jobs": report_jobs,
         "today_work_items": today_items,
@@ -164,6 +172,9 @@ def get_stats(db: Session = Depends(get_db)):
     sent_reports = db.query(func.count(Report.id)).filter(
         Report.status == ReportStatus.SENT
     ).scalar()
+    partial_sent_reports = db.query(func.count(Report.id)).filter(
+        Report.status == ReportStatus.PARTIAL_SENT
+    ).scalar()
     failed_reports = db.query(func.count(Report.id)).filter(
         Report.status == ReportStatus.FAILED
     ).scalar()
@@ -177,6 +188,7 @@ def get_stats(db: Session = Depends(get_db)):
         },
         "reports": {
             "sent": sent_reports,
+            "partial_sent": partial_sent_reports,
             "failed": failed_reports,
         },
     }

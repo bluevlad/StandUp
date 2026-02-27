@@ -98,6 +98,7 @@ class QAAgent:
             duration = time.time() - start_time
             logger.error(f"QA-Agent 오류: {e}", exc_info=True)
             try:
+                db.rollback()
                 log = AgentLog(
                     agent_name="QA-Agent",
                     action="issues_scan",
@@ -108,7 +109,7 @@ class QAAgent:
                 db.add(log)
                 db.commit()
             except Exception:
-                pass
+                db.rollback()
         finally:
             db.close()
 

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from ..core.config import settings
+from ..core.config import settings, now_kst
 from ..models.issue import WorkItem, ItemCategory, ItemStatus
 from ..models.report import Report, ReportItem, ReportType, ReportStatus
 from ..services import config_service
@@ -59,9 +59,14 @@ class ReportService:
     """보고서 생성/관리 서비스"""
 
     def generate_daily_report(self, db: Session) -> Report:
-        """일일보고 생성"""
-        now = datetime.now()
-        period_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        """일일보고 생성 (전일 보고 시간 ~ 현재, 24시간 연속 커버리지)"""
+        now = now_kst()
+        report_hour = config_service.get_setting_int(db, "daily_report_hour", settings.daily_report_hour)
+        report_minute = config_service.get_setting_int(db, "daily_report_minute", settings.daily_report_minute)
+        # 전일 보고 시간부터 시작 (빈틈 없는 24시간 커버리지)
+        period_start = (now - timedelta(days=1)).replace(
+            hour=report_hour, minute=report_minute, second=0, microsecond=0
+        )
         period_end = now
 
         return self._generate_report(
@@ -75,7 +80,7 @@ class ReportService:
 
     def generate_weekly_report(self, db: Session) -> Report:
         """주간보고 생성"""
-        now = datetime.now()
+        now = now_kst()
         period_start = now - timedelta(days=now.weekday())
         period_start = period_start.replace(hour=0, minute=0, second=0, microsecond=0)
         period_end = now
@@ -92,7 +97,7 @@ class ReportService:
 
     def generate_monthly_report(self, db: Session) -> Report:
         """월간보고 생성"""
-        now = datetime.now()
+        now = now_kst()
         period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         period_end = now
 
@@ -163,7 +168,7 @@ class ReportService:
             planned=planned_grouped,
             required=required_grouped,
             in_progress=progress_grouped,
-            generated_at=datetime.now(),
+            generated_at=now_kst(),
         )
 
         # Report 엔티티 생성

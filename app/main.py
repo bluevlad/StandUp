@@ -8,8 +8,10 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .core.config import settings
-from .core.database import engine, Base
+from alembic.config import Config as AlembicConfig
+from alembic import command as alembic_command
+
+from .core.config import settings, APP_VERSION
 from .core.logging_config import setup_logging
 from .core.scheduler import setup_scheduler, shutdown_scheduler
 from .api.v1.endpoints import health, reports, work_items, config
@@ -24,13 +26,15 @@ async def lifespan(app: FastAPI):
     """앱 시작/종료 시 실행"""
     logger.info("StandUp Agent 시작 (port: %d)", settings.api_port)
 
-    # DB 테이블 자동 생성
-    from .models import (  # noqa: F401
-        WorkItem, Report, ReportItem, AgentLog,
-        GitProvider, Repository, Recipient, AppSetting,
-    )
-    Base.metadata.create_all(bind=engine)
-    logger.info("DB 테이블 확인 완료")
+    # Alembic 마이그레이션 실행
+    try:
+        alembic_cfg = AlembicConfig(str(settings.BASE_DIR / "alembic.ini"))
+        alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
+        alembic_command.upgrade(alembic_cfg, "head")
+        logger.info("DB 마이그레이션 완료")
+    except Exception as e:
+        logger.error(f"DB 마이그레이션 실패: {e}", exc_info=True)
+        raise
 
     # 스케줄러 시작 (+ 초기 Agent 스캔)
     setup_scheduler()
@@ -44,7 +48,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="StandUp",
     description="업무관리 자동화 Agent - Git Issues 기반 업무 수집/분류/보고서 자동 생성",
-    version="0.3.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -59,6 +63,6 @@ app.include_router(config.router, prefix="/api/v1")
 def root():
     return {
         "service": "StandUp",
-        "version": "0.3.0",
+        "version": APP_VERSION,
         "docs": "/docs",
     }

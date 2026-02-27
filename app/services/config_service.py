@@ -65,7 +65,8 @@ def get_active_recipients(db: Session, report_type: str = None) -> list[str]:
         if report_type:
             return [
                 r.email for r in recipients
-                if r.report_types == "all" or report_type in r.report_types.split(",")
+                if r.report_types == "all"
+                or report_type in [t.strip() for t in r.report_types.split(",")]
             ]
         return [r.email for r in recipients]
 

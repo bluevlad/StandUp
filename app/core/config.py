@@ -2,10 +2,22 @@
 StandUp 설정 관리 모듈
 """
 
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import Field
 from functools import lru_cache
+
+
+APP_VERSION = "0.3.0"
+
+# 한국 표준시 (UTC+9)
+KST = timezone(timedelta(hours=9))
+
+
+def now_kst() -> datetime:
+    """현재 한국 표준시 반환 (timezone-aware)"""
+    return datetime.now(KST)
 
 
 class Settings(BaseSettings):

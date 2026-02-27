@@ -22,6 +22,7 @@ class ReportStatus(str, enum.Enum):
     """보고서 상태"""
     GENERATED = "generated"
     SENT = "sent"
+    PARTIAL_SENT = "partial_sent"
     FAILED = "failed"
 
 

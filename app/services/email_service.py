@@ -146,15 +146,19 @@ class EmailService:
         except smtplib.SMTPAuthenticationError:
             error_msg = "Gmail 인증 실패. 앱 비밀번호를 확인하세요."
             logger.error(f"SMTP 인증 실패: {error_msg}")
-            for recipient in recipients:
-                if not any(r.recipient == recipient for r in results):
-                    results.append(SendResult(recipient=recipient, success=False, error_message=error_msg))
+            processed = {r.recipient for r in results}
+            results.extend(
+                SendResult(recipient=r, success=False, error_message=error_msg)
+                for r in recipients if r not in processed
+            )
         except Exception as e:
             error_msg = f"SMTP 연결 오류: {e}"
             logger.error(error_msg)
-            for recipient in recipients:
-                if not any(r.recipient == recipient for r in results):
-                    results.append(SendResult(recipient=recipient, success=False, error_message=error_msg))
+            processed = {r.recipient for r in results}
+            results.extend(
+                SendResult(recipient=r, success=False, error_message=error_msg)
+                for r in recipients if r not in processed
+            )
 
         success_count = sum(1 for r in results if r.success)
         logger.info(f"일괄 발송 완료: {success_count}/{len(recipients)} 성공")

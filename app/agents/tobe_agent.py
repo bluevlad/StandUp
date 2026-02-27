@@ -101,6 +101,7 @@ class TobeAgent:
             duration = time.time() - start_time
             logger.error(f"Tobe-Agent 오류: {e}", exc_info=True)
             try:
+                db.rollback()
                 log = AgentLog(
                     agent_name="Tobe-Agent",
                     action="commit_track",
@@ -111,7 +112,7 @@ class TobeAgent:
                 db.add(log)
                 db.commit()
             except Exception:
-                pass
+                db.rollback()
         finally:
             db.close()
 

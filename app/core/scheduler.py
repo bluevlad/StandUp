@@ -2,8 +2,11 @@
 APScheduler 스케줄러 설정
 """
 
+import calendar
 import logging
 import threading
+from datetime import date
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
@@ -47,6 +50,17 @@ def run_initial_scan():
         logger.info("=== 초기 Agent 스캔 완료 ===")
     except Exception as e:
         logger.error(f"초기 스캔 오류: {e}", exc_info=True)
+
+
+def _is_last_friday_of_month() -> bool:
+    """오늘이 이번 달 마지막 금요일인지 확인"""
+    today = date.today()
+    if today.weekday() != 4:  # 금요일이 아니면 False
+        return False
+    # 이번 달의 마지막 날
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    # 다음 금요일이 다음 달이면 오늘이 마지막 금요일
+    return today.day + 7 > last_day
 
 
 def _safe_add_job(func, trigger, job_id, job_name):
@@ -111,13 +125,19 @@ def setup_scheduler():
         "weekly_report", "주간업무보고 발송",
     )
 
-    # 월간보고: 마지막주 금요일
+    # 월간보고: 마지막주 금요일 (매주 금요일 실행 + 마지막 주 검증)
+    def _monthly_report_if_last_friday():
+        if _is_last_friday_of_month():
+            report_agent.send_monthly_report()
+        else:
+            logger.debug("월간보고 스킵: 마지막 주 금요일이 아닙니다.")
+
     _safe_add_job(
-        report_agent.send_monthly_report,
+        _monthly_report_if_last_friday,
         CronTrigger(
             hour=settings.monthly_report_hour,
             minute=settings.monthly_report_minute,
-            day="last fri",
+            day_of_week="fri",
         ),
         "monthly_report", "월간업무보고 발송",
     )
