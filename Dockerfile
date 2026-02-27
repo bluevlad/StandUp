@@ -2,6 +2,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Timezone 설정 (스케줄러, 로그 타임스탬프 등 KST 통일)
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # System dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \

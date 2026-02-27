@@ -8,6 +8,8 @@ services:
       - "9060:9060"
     env_file:
       - .env.production
+    environment:
+      - TZ=Asia/Seoul
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped

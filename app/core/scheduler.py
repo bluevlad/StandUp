@@ -53,8 +53,9 @@ def run_initial_scan():
 
 
 def _is_last_friday_of_month() -> bool:
-    """오늘이 이번 달 마지막 금요일인지 확인"""
-    today = date.today()
+    """오늘이 이번 달 마지막 금요일인지 확인 (KST 기준)"""
+    from .config import now_kst
+    today = now_kst().date()
     if today.weekday() != 4:  # 금요일이 아니면 False
         return False
     # 이번 달의 마지막 날
@@ -89,17 +90,20 @@ def setup_scheduler():
     # 이벤트 리스너 등록
     scheduler.add_listener(_job_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
+    # 스케줄러 timezone (CronTrigger에 명시적 전달 필수 - 컨테이너 UTC 대응)
+    tz = "Asia/Seoul"
+
     # QA-Agent: 매 2시간 실행 (업무시간 내)
     _safe_add_job(
         qa_agent.run,
-        CronTrigger(hour="8-18/2", minute=0, day_of_week="mon-fri"),
+        CronTrigger(hour="8-18/2", minute=0, day_of_week="mon-fri", timezone=tz),
         "qa_agent_scan", "QA-Agent Issues 스캔",
     )
 
     # Tobe-Agent: 매 1시간 실행 (업무시간 내)
     _safe_add_job(
         tobe_agent.run,
-        CronTrigger(hour="8-18", minute=30, day_of_week="mon-fri"),
+        CronTrigger(hour="8-18", minute=30, day_of_week="mon-fri", timezone=tz),
         "tobe_agent_track", "Tobe-Agent 진행사항 추적",
     )
 
@@ -110,6 +114,7 @@ def setup_scheduler():
             hour=settings.daily_report_hour,
             minute=settings.daily_report_minute,
             day_of_week="mon-fri",
+            timezone=tz,
         ),
         "daily_report", "일일업무보고 발송",
     )
@@ -121,6 +126,7 @@ def setup_scheduler():
             hour=settings.weekly_report_hour,
             minute=settings.weekly_report_minute,
             day_of_week="fri",
+            timezone=tz,
         ),
         "weekly_report", "주간업무보고 발송",
     )
@@ -138,6 +144,7 @@ def setup_scheduler():
             hour=settings.monthly_report_hour,
             minute=settings.monthly_report_minute,
             day_of_week="fri",
+            timezone=tz,
         ),
         "monthly_report", "월간업무보고 발송",
     )
