@@ -28,6 +28,7 @@ class EmailService:
 
     SMTP_SERVER = "smtp.gmail.com"
     SMTP_PORT = 587
+    SMTP_TIMEOUT = 30  # 초
 
     def __init__(
         self,
@@ -72,7 +73,7 @@ class EmailService:
             html_part = MIMEText(html_content, "html", "utf-8")
             message.attach(html_part)
 
-            with smtplib.SMTP(self.SMTP_SERVER, self.SMTP_PORT) as server:
+            with smtplib.SMTP(self.SMTP_SERVER, self.SMTP_PORT, timeout=self.SMTP_TIMEOUT) as server:
                 server.starttls()
                 server.login(self.sender_email, self.app_password)
                 server.sendmail(
@@ -106,11 +107,54 @@ class EmailService:
         html_content: str,
         sender_name: str = "StandUp Report"
     ) -> list[SendResult]:
-        """다수 수신자에게 일괄 발송"""
+        """다수 수신자에게 일괄 발송 (SMTP 연결 재사용)"""
+        if not self.is_configured:
+            return [
+                SendResult(recipient=r, success=False, error_message="Gmail 설정이 완료되지 않았습니다.")
+                for r in recipients
+            ]
+
         results = []
-        for recipient in recipients:
-            result = self.send(recipient, subject, html_content, sender_name)
-            results.append(result)
+        try:
+            with smtplib.SMTP(self.SMTP_SERVER, self.SMTP_PORT, timeout=self.SMTP_TIMEOUT) as server:
+                server.starttls()
+                server.login(self.sender_email, self.app_password)
+
+                for recipient in recipients:
+                    try:
+                        message = MIMEMultipart("alternative")
+                        message["Subject"] = Header(subject, "utf-8")
+                        message["From"] = f"{sender_name} <{self.sender_email}>"
+                        message["To"] = recipient
+
+                        html_part = MIMEText(html_content, "html", "utf-8")
+                        message.attach(html_part)
+
+                        server.sendmail(self.sender_email, recipient, message.as_string())
+                        results.append(SendResult(recipient=recipient, success=True))
+                        logger.info(f"이메일 발송 성공: {recipient}")
+
+                    except smtplib.SMTPRecipientsRefused:
+                        error_msg = f"수신자 거부: {recipient}"
+                        logger.error(f"이메일 발송 실패: {error_msg}")
+                        results.append(SendResult(recipient=recipient, success=False, error_message=error_msg))
+                    except Exception as e:
+                        error_msg = str(e)
+                        logger.error(f"이메일 발송 실패 ({recipient}): {error_msg}")
+                        results.append(SendResult(recipient=recipient, success=False, error_message=error_msg))
+
+        except smtplib.SMTPAuthenticationError:
+            error_msg = "Gmail 인증 실패. 앱 비밀번호를 확인하세요."
+            logger.error(f"SMTP 인증 실패: {error_msg}")
+            for recipient in recipients:
+                if not any(r.recipient == recipient for r in results):
+                    results.append(SendResult(recipient=recipient, success=False, error_message=error_msg))
+        except Exception as e:
+            error_msg = f"SMTP 연결 오류: {e}"
+            logger.error(error_msg)
+            for recipient in recipients:
+                if not any(r.recipient == recipient for r in results):
+                    results.append(SendResult(recipient=recipient, success=False, error_message=error_msg))
 
         success_count = sum(1 for r in results if r.success)
         logger.info(f"일괄 발송 완료: {success_count}/{len(recipients)} 성공")

@@ -49,6 +49,105 @@ def health_check(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/report-diagnosis")
+def report_diagnosis(db: Session = Depends(get_db)):
+    """보고서 발송 진단 (설정 상태, 최근 발송 이력 확인)"""
+    from ....services import config_service
+    from ....services.email_service import get_email_service, get_email_service_with_config
+
+    # 1. Gmail 설정 확인
+    gmail_config = config_service.get_gmail_config(db)
+    gmail_ok = bool(gmail_config["address"] and gmail_config["password"])
+    if gmail_ok:
+        email_service = get_email_service_with_config(
+            gmail_config["address"], gmail_config["password"]
+        )
+    else:
+        email_service = get_email_service()
+
+    # 2. 수신자 확인
+    daily_recipients = config_service.get_active_recipients(db, "daily")
+    weekly_recipients = config_service.get_active_recipients(db, "weekly")
+
+    # 3. 최근 보고서 상태
+    recent_reports = (
+        db.query(Report)
+        .order_by(Report.generated_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    # 4. 최근 Report-Agent 로그
+    recent_logs = (
+        db.query(AgentLog)
+        .filter(AgentLog.agent_name == "Report-Agent")
+        .order_by(AgentLog.executed_at.desc())
+        .limit(5)
+        .all()
+    )
+
+    # 5. 스케줄러 보고서 작업 상태
+    report_jobs = []
+    if scheduler.running:
+        for job in scheduler.get_jobs():
+            if "report" in job.id:
+                report_jobs.append({
+                    "id": job.id,
+                    "name": job.name,
+                    "next_run": str(job.next_run_time) if job.next_run_time else None,
+                })
+
+    # 6. 오늘 WorkItem 수
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_items = db.query(func.count(WorkItem.id)).filter(
+        WorkItem.updated_at >= today_start
+    ).scalar()
+
+    issues = []
+    if not gmail_ok and not email_service.is_configured:
+        issues.append("Gmail 미설정 (GMAIL_ADDRESS, GMAIL_APP_PASSWORD)")
+    if not daily_recipients:
+        issues.append("일일보고 수신자 미설정")
+    if not report_jobs:
+        issues.append("스케줄러에 보고서 작업 미등록")
+    if today_items == 0:
+        issues.append("오늘 업데이트된 WorkItem 0건 (빈 보고서 발송 가능)")
+
+    return {
+        "status": "ok" if not issues else "warning",
+        "issues": issues,
+        "gmail_configured": gmail_ok or email_service.is_configured,
+        "gmail_address": gmail_config["address"][:3] + "***" if gmail_config["address"] else "",
+        "recipients": {
+            "daily": daily_recipients,
+            "weekly": weekly_recipients,
+        },
+        "scheduler_report_jobs": report_jobs,
+        "today_work_items": today_items,
+        "recent_reports": [
+            {
+                "id": r.id,
+                "type": r.report_type.value,
+                "status": r.status.value,
+                "subject": r.subject,
+                "error": r.error_message,
+                "generated_at": r.generated_at.isoformat() if r.generated_at else None,
+                "sent_at": r.sent_at.isoformat() if r.sent_at else None,
+            }
+            for r in recent_reports
+        ],
+        "recent_agent_logs": [
+            {
+                "action": log.action,
+                "status": log.status,
+                "detail": log.detail,
+                "executed_at": log.executed_at.isoformat() if log.executed_at else None,
+            }
+            for log in recent_logs
+        ],
+    }
+
+
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
     """업무 통계 조회"""

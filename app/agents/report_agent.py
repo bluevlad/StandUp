@@ -3,6 +3,7 @@ Report-Agent
 보고서 생성 및 이메일 발송 관리
 """
 
+import time
 import logging
 from datetime import datetime
 
@@ -11,6 +12,7 @@ from ..services.report_service import get_report_service
 from ..services.email_service import get_email_service, get_email_service_with_config
 from ..services import config_service
 from ..models.report import Report, ReportStatus
+from ..models.agent_log import AgentLog
 
 logger = logging.getLogger(__name__)
 
@@ -20,40 +22,67 @@ class ReportAgent:
 
     def send_daily_report(self):
         """일일보고 생성 및 발송"""
-        logger.info("=== 일일업무보고 생성 시작 ===")
-        db = SessionLocal()
-        try:
-            report_service = get_report_service()
-            report = report_service.generate_daily_report(db)
-            self._send_report(db, report)
-        except Exception as e:
-            logger.error(f"일일보고 오류: {e}", exc_info=True)
-        finally:
-            db.close()
+        self._run_report("daily", "일일업무보고")
 
     def send_weekly_report(self):
         """주간보고 생성 및 발송"""
-        logger.info("=== 주간업무보고 생성 시작 ===")
-        db = SessionLocal()
-        try:
-            report_service = get_report_service()
-            report = report_service.generate_weekly_report(db)
-            self._send_report(db, report)
-        except Exception as e:
-            logger.error(f"주간보고 오류: {e}", exc_info=True)
-        finally:
-            db.close()
+        self._run_report("weekly", "주간업무보고")
 
     def send_monthly_report(self):
         """월간보고 생성 및 발송"""
-        logger.info("=== 월간업무보고 생성 시작 ===")
+        self._run_report("monthly", "월간업무보고")
+
+    def _run_report(self, report_type: str, report_label: str):
+        """보고서 생성/발송 공통 로직 (AgentLog 기록 포함)"""
+        logger.info(f"=== {report_label} 생성 시작 ===")
+        start_time = time.time()
+
         db = SessionLocal()
         try:
             report_service = get_report_service()
-            report = report_service.generate_monthly_report(db)
+
+            if report_type == "daily":
+                report = report_service.generate_daily_report(db)
+            elif report_type == "weekly":
+                report = report_service.generate_weekly_report(db)
+            else:
+                report = report_service.generate_monthly_report(db)
+
             self._send_report(db, report)
+
+            duration = time.time() - start_time
+            status_str = report.status.value
+            detail = f"{report.subject} → {status_str}"
+            if report.error_message:
+                detail += f" ({report.error_message})"
+
+            log = AgentLog(
+                agent_name="Report-Agent",
+                action=f"{report_type}_report",
+                status="success" if report.status == ReportStatus.SENT else "error",
+                detail=detail,
+                items_processed=len(report.items),
+                duration_seconds=round(duration, 2),
+            )
+            db.add(log)
+            db.commit()
+            logger.info(f"=== {report_label} 완료: {status_str} ({duration:.1f}초) ===")
+
         except Exception as e:
-            logger.error(f"월간보고 오류: {e}", exc_info=True)
+            duration = time.time() - start_time
+            logger.error(f"{report_label} 오류: {e}", exc_info=True)
+            try:
+                log = AgentLog(
+                    agent_name="Report-Agent",
+                    action=f"{report_type}_report",
+                    status="error",
+                    detail=str(e)[:1000],
+                    duration_seconds=round(duration, 2),
+                )
+                db.add(log)
+                db.commit()
+            except Exception:
+                pass
         finally:
             db.close()
 
@@ -85,6 +114,8 @@ class ReportAgent:
             report.error_message = "Gmail 미설정"
             db.commit()
             return
+
+        logger.info(f"이메일 발송 시작: 수신자 {len(recipients)}명 → {recipients}")
 
         results = email_service.send_batch(
             recipients=recipients,
