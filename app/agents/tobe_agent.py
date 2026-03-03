@@ -6,7 +6,7 @@ Git Issues 조치사항 및 Commit 고도화 내용을 진행사항으로 정리
 import re
 import time
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -44,10 +44,10 @@ class TobeAgent:
                 WorkItem.related_commits.isnot(None)
             ).count()
             if commit_items == 0:
-                since = datetime.now() - timedelta(days=self.INITIAL_SCAN_DAYS)
+                since = datetime.now(timezone.utc) - timedelta(days=self.INITIAL_SCAN_DAYS)
                 logger.info(f"초기 스캔 모드: 최근 {self.INITIAL_SCAN_DAYS}일")
             else:
-                since = datetime.now() - timedelta(hours=self.REGULAR_SCAN_HOURS)
+                since = datetime.now(timezone.utc) - timedelta(hours=self.REGULAR_SCAN_HOURS)
                 logger.info(f"정기 스캔 모드: 최근 {self.REGULAR_SCAN_HOURS}시간")
 
             total_tracked = 0
