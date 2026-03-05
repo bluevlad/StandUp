@@ -1,0 +1,48 @@
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>유형</th>
+                <th>제목</th>
+                <th>기간</th>
+                <th>항목수</th>
+                <th>상태</th>
+                <th>수신자</th>
+                <th>생성일시</th>
+                <th>발송일시</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in reports %}
+            <tr onclick="location.href='/dashboard/reports/{{ r.id }}'">
+                <td>{{ r.id }}</td>
+                <td><span class="badge badge-{{ r.report_type.value }}">{{ r.report_type.value }}</span></td>
+                <td>{{ r.subject }}</td>
+                <td style="white-space:nowrap;">{{ r.period_start.strftime('%m/%d') }} ~ {{ r.period_end.strftime('%m/%d') }}</td>
+                <td>{{ r.items | length }}건</td>
+                <td><span class="badge badge-{{ r.status.value }}">{{ r.status.value }}</span></td>
+                <td style="max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ r.recipients }}</td>
+                <td style="white-space:nowrap;">{{ r.generated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td style="white-space:nowrap;">{% if r.sent_at %}{{ r.sent_at.strftime('%Y-%m-%d %H:%M') }}{% else %}-{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="9" style="text-align:center; color:#94a3b8; padding:24px;">보고서가 없습니다.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if reports | length >= 20 %}
+<div class="pagination">
+    {% if current_page > 1 %}
+    <a href="/dashboard/reports?report_type={{ current_type }}&page={{ current_page - 1 }}"
+       hx-get="/dashboard/reports/table?report_type={{ current_type }}&page={{ current_page - 1 }}"
+       hx-target="#report-table">&laquo; 이전</a>
+    {% endif %}
+    <a class="active">{{ current_page }}</a>
+    <a href="/dashboard/reports?report_type={{ current_type }}&page={{ current_page + 1 }}"
+       hx-get="/dashboard/reports/table?report_type={{ current_type }}&page={{ current_page + 1 }}"
+       hx-target="#report-table">다음 &raquo;</a>
+</div>
+{% endif %}

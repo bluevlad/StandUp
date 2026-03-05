@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - {{ report.subject }}{% endblock %}
+{% block page_title %}보고서 상세{% endblock %}
+
+{% block content %}
+<a href="/dashboard/reports" class="back-link">&larr; 목록으로</a>
+
+<!-- Meta Info -->
+<div class="card">
+    <div class="card-header">
+        <h2>{{ report.subject }}</h2>
+        <span class="badge badge-{{ report.status.value }}">{{ report.status.value }}</span>
+    </div>
+    <div class="detail-meta">
+        <div class="meta-item">
+            <div class="meta-label">유형</div>
+            <span class="badge badge-{{ report.report_type.value }}">{{ report.report_type.value }}</span>
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">보고 기간</div>
+            {{ report.period_start.strftime('%Y-%m-%d %H:%M') }} ~ {{ report.period_end.strftime('%Y-%m-%d %H:%M') }}
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">수신자</div>
+            {{ report.recipients }}
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">생성일시</div>
+            {{ report.generated_at.strftime('%Y-%m-%d %H:%M:%S') }}
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">발송일시</div>
+            {% if report.sent_at %}{{ report.sent_at.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}-{% endif %}
+        </div>
+        <div class="meta-item">
+            <div class="meta-label">항목수</div>
+            {{ report.items | length }}건
+        </div>
+    </div>
+</div>
+
+<!-- Report Items Table -->
+{% if report.items %}
+<div class="card items-section">
+    <div class="card-header">
+        <h2>보고서 항목</h2>
+    </div>
+
+    {% set categories = {'planned': '예정사항', 'required': '요구사항', 'in_progress': '진행사항'} %}
+    {% for cat_key, cat_label in categories.items() %}
+    {% set cat_items = report.items | selectattr('category', 'equalto', cat_key) | list %}
+    {% if cat_items %}
+    <div class="category-group">
+        <div class="category-label">{{ cat_label }} ({{ cat_items | length }}건)</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>프로젝트</th>
+                    <th>제목</th>
+                    <th>출처</th>
+                    <th>상세</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in cat_items %}
+                <tr style="cursor:default;">
+                    <td>{{ item.project_name }}</td>
+                    <td>
+                        {% if item.source_ref %}
+                        <a href="{{ item.source_ref }}" target="_blank" style="color:#2563eb; text-decoration:none;">{{ item.title }}</a>
+                        {% else %}
+                        {{ item.title }}
+                        {% endif %}
+                    </td>
+                    <td><span class="badge" style="background:#f1f5f9; color:#64748b;">{{ item.source_type }}</span></td>
+                    <td style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ item.detail or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Email HTML Preview -->
+{% if report.content_html %}
+<div class="card" style="margin-top:20px;">
+    <div class="card-header">
+        <h2>이메일 미리보기</h2>
+        <button onclick="togglePreview()" style="font-size:12px; padding:4px 12px; border:1px solid #e2e8f0; border-radius:4px; background:#fff; cursor:pointer;">
+            펼치기/접기
+        </button>
+    </div>
+    <div id="email-preview" class="report-content" style="display:none;">
+        <iframe id="email-iframe" sandbox="allow-same-origin"></iframe>
+    </div>
+</div>
+
+<script>
+function togglePreview() {
+    var el = document.getElementById('email-preview');
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+        var iframe = document.getElementById('email-iframe');
+        var doc = iframe.contentDocument || iframe.contentWindow.document;
+        doc.open();
+        doc.write({{ report.content_html | tojson }});
+        doc.close();
+        iframe.style.height = doc.body.scrollHeight + 40 + 'px';
+        setTimeout(function() {
+            iframe.style.height = doc.body.scrollHeight + 40 + 'px';
+        }, 200);
+    } else {
+        el.style.display = 'none';
+    }
+}
+</script>
+{% endif %}
+{% endblock %}
