@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block page_meta %}업무보고 발송 내역{% endblock %}
+
+{% block content %}
+<!-- Type Tabs -->
+<div class="tab-bar">
+    <a href="/dashboard/reports"
+       hx-get="/dashboard/reports/table"
+       hx-target="#report-table"
+       hx-indicator="#loading"
+       class="{% if current_type == 'all' %}active{% endif %}">전체</a>
+    <a href="/dashboard/reports?report_type=daily"
+       hx-get="/dashboard/reports/table?report_type=daily"
+       hx-target="#report-table"
+       hx-indicator="#loading"
+       class="{% if current_type == 'daily' %}active{% endif %}">일일</a>
+    <a href="/dashboard/reports?report_type=weekly"
+       hx-get="/dashboard/reports/table?report_type=weekly"
+       hx-target="#report-table"
+       hx-indicator="#loading"
+       class="{% if current_type == 'weekly' %}active{% endif %}">주간</a>
+    <a href="/dashboard/reports?report_type=monthly"
+       hx-get="/dashboard/reports/table?report_type=monthly"
+       hx-target="#report-table"
+       hx-indicator="#loading"
+       class="{% if current_type == 'monthly' %}active{% endif %}">월간</a>
+    <span id="loading" class="htmx-indicator" style="margin-left:auto; align-self:center;">로딩중...</span>
+</div>
+
+<!-- Tab click handler for active state -->
+<script>
+document.addEventListener('htmx:afterRequest', function(e) {
+    if (e.detail.target && e.detail.target.id === 'report-table') {
+        document.querySelectorAll('.tab-bar a').forEach(function(a) { a.classList.remove('active'); });
+        e.detail.elt.classList.add('active');
+    }
+});
+</script>
+
+<!-- Report Table -->
+<div class="card">
+    <div id="report-table">
+        {% include "partials/report_table.html" %}
+    </div>
+</div>
+{% endblock %}

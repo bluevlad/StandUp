@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Statistics{% endblock %}
+{% block page_title %}Statistics{% endblock %}
+{% block page_meta %}업무 통계 분석{% endblock %}
+
+{% block content %}
+<!-- Period Tabs -->
+<div class="tab-bar">
+    <a href="/dashboard/stats?period_type=daily"
+       class="{% if current_period == 'daily' %}active{% endif %}">일별</a>
+    <a href="/dashboard/stats?period_type=weekly"
+       class="{% if current_period == 'weekly' %}active{% endif %}">주별</a>
+    <a href="/dashboard/stats?period_type=monthly"
+       class="{% if current_period == 'monthly' %}active{% endif %}">월별</a>
+</div>
+
+<!-- Summary Cards -->
+<div class="summary-grid">
+    <div class="summary-card blue">
+        <div class="number">{{ summary.total_items }}</div>
+        <div class="label">전체 업무</div>
+    </div>
+    <div class="summary-card green">
+        <div class="number">{{ summary.completion_rate }}%</div>
+        <div class="label">완료율</div>
+    </div>
+    <div class="summary-card amber">
+        <div class="number">{{ summary.by_status.get('in_progress', 0) }}</div>
+        <div class="label">진행중</div>
+    </div>
+    <div class="summary-card red">
+        <div class="number">{{ summary.by_status.get('open', 0) }}</div>
+        <div class="label">미완료(Open)</div>
+    </div>
+    <div class="summary-card slate">
+        <div class="number">{{ summary.by_status.get('resolved', 0) + summary.by_status.get('closed', 0) }}</div>
+        <div class="label">완료</div>
+    </div>
+</div>
+
+<!-- Trend Chart -->
+<div class="card">
+    <div class="card-header">
+        <h2>업무 추이</h2>
+    </div>
+    <div class="chart-container" style="height:320px;">
+        <canvas id="trendChart"></canvas>
+    </div>
+</div>
+
+<!-- Category & Status Charts -->
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+    <div class="card">
+        <div class="card-header">
+            <h2>분류별 현황</h2>
+        </div>
+        <div class="chart-container" style="height:280px;">
+            <canvas id="categoryChart"></canvas>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header">
+            <h2>상태별 현황</h2>
+        </div>
+        <div class="chart-container" style="height:280px;">
+            <canvas id="statusChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Report Stats -->
+<div class="card">
+    <div class="card-header">
+        <h2>보고서 발송 현황</h2>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:16px;">
+        <div class="summary-card blue">
+            <div class="number">{{ report_stats.total_reports }}</div>
+            <div class="label">전체 보고서</div>
+        </div>
+        <div class="summary-card green">
+            <div class="number">{{ report_stats.success_rate }}%</div>
+            <div class="label">발송 성공률</div>
+        </div>
+        <div class="summary-card" style="border-top:3px solid #dbeafe;">
+            <div class="number" style="color:#1e40af;">{{ report_stats.by_type.get('daily', 0) }}</div>
+            <div class="label">일일보고</div>
+        </div>
+        <div class="summary-card" style="border-top:3px solid #dcfce7;">
+            <div class="number" style="color:#166534;">{{ report_stats.by_type.get('weekly', 0) }}</div>
+            <div class="label">주간보고</div>
+        </div>
+        <div class="summary-card" style="border-top:3px solid #fef3c7;">
+            <div class="number" style="color:#92400e;">{{ report_stats.by_type.get('monthly', 0) }}</div>
+            <div class="label">월간보고</div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Bar Chart -->
+{% if summary.projects %}
+<div class="card">
+    <div class="card-header">
+        <h2>프로젝트별 업무량</h2>
+    </div>
+    <div class="chart-container" style="height:{{ [summary.projects | length * 35, 200] | max }}px;">
+        <canvas id="projectChart"></canvas>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Trend Chart
+    var trendData = {{ trend | tojson }};
+    var labels = trendData.map(function(d) {
+        if (d.week_start) return d.week_start;
+        if (d.date.length === 7) return d.date;
+        return d.date.substring(5);
+    });
+
+    new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '전체',
+                    data: trendData.map(function(d) { return d.total; }),
+                    borderColor: '#64748b',
+                    backgroundColor: 'rgba(100,116,139,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                },
+                {
+                    label: '예정',
+                    data: trendData.map(function(d) { return d.planned; }),
+                    borderColor: '#2563eb',
+                    tension: 0.3,
+                },
+                {
+                    label: '요구',
+                    data: trendData.map(function(d) { return d.required; }),
+                    borderColor: '#dc2626',
+                    tension: 0.3,
+                },
+                {
+                    label: '진행',
+                    data: trendData.map(function(d) { return d.in_progress; }),
+                    borderColor: '#d97706',
+                    tension: 0.3,
+                },
+                {
+                    label: '완료',
+                    data: trendData.map(function(d) { return d.resolved; }),
+                    borderColor: '#16a34a',
+                    tension: 0.3,
+                },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'top' },
+            },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+        }
+    });
+
+    // Category Doughnut
+    var catData = {{ summary.by_category | tojson }};
+    var catLabels = { planned: '예정사항', required: '요구사항', in_progress: '진행사항' };
+    var catColors = { planned: '#3b82f6', required: '#ef4444', in_progress: '#f59e0b' };
+
+    new Chart(document.getElementById('categoryChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(catData).map(function(k) { return catLabels[k] || k; }),
+            datasets: [{
+                data: Object.values(catData),
+                backgroundColor: Object.keys(catData).map(function(k) { return catColors[k] || '#94a3b8'; }),
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+
+    // Status Doughnut
+    var statusData = {{ summary.by_status | tojson }};
+    var statusLabels = { open: 'Open', in_progress: '진행중', resolved: '완료', closed: '종료' };
+    var statusColors = { open: '#ef4444', in_progress: '#f59e0b', resolved: '#22c55e', closed: '#64748b' };
+
+    new Chart(document.getElementById('statusChart'), {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(statusData).map(function(k) { return statusLabels[k] || k; }),
+            datasets: [{
+                data: Object.values(statusData),
+                backgroundColor: Object.keys(statusData).map(function(k) { return statusColors[k] || '#94a3b8'; }),
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' }
+            }
+        }
+    });
+
+    // Project Bar Chart
+    {% if summary.projects %}
+    var projects = {{ summary.projects | tojson }};
+    var projLabels = Object.keys(projects).map(function(k) {
+        return k.length > 30 ? k.substring(0, 30) + '...' : k;
+    });
+
+    new Chart(document.getElementById('projectChart'), {
+        type: 'bar',
+        data: {
+            labels: projLabels,
+            datasets: [{
+                label: '업무 건수',
+                data: Object.values(projects),
+                backgroundColor: '#3b82f6',
+                borderRadius: 4,
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, ticks: { stepSize: 1 } }
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}
