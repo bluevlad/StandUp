@@ -12,7 +12,7 @@ services:
       - TZ=Asia/Seoul
     volumes:
       - ./logs:/app/logs
-    restart: unless-stopped
+    restart: always
     networks:
       - app-network
     healthcheck:
