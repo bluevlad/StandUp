@@ -64,6 +64,7 @@ class Settings(BaseSettings):
 
     # API
     api_port: int = Field(default=9060, env="API_PORT")
+    root_path: str = Field(default="", env="ROOT_PATH")
 
     @property
     def recipient_list(self) -> list[str]:
