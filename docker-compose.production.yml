@@ -10,6 +10,7 @@ services:
       - .env.production
     environment:
       - TZ=Asia/Seoul
+      - ROOT_PATH=/standup
     volumes:
       - ./logs:/app/logs
     restart: always

@@ -50,6 +50,7 @@ app = FastAPI(
     description="업무관리 자동화 Agent - Git Issues 기반 업무 수집/분류/보고서 자동 생성",
     version=APP_VERSION,
     lifespan=lifespan,
+    root_path=settings.root_path,
 )
 
 # 라우터 등록
