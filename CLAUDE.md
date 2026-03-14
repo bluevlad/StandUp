@@ -50,6 +50,17 @@ app/
 └── api/v1/endpoints/ # FastAPI 라우터
 ```
 
+## Help Page 관리
+
+> 작성 표준: [HELP_PAGE_GUIDE.md](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/standards/documentation/HELP_PAGE_GUIDE.md)
+> HTML 템플릿: [help-page-template.html](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/standards/documentation/templates/help-page-template.html)
+
+- **기능 추가/변경/삭제 시 반드시 헬프 페이지도 함께 업데이트**
+- 헬프 파일 위치: `app/static/help/`
+- 서비스 accent-color: `#ef4444` (Red)
+- 대상 가이드 파일:
+  - `user-guide.html` — 대시보드/통계 사용 가이드
+
 ## Do NOT
 - Oracle 문법 사용 금지 (NVL, SYSDATE, ROWNUM 등)
 - .env 파일을 git에 커밋 금지
