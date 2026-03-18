@@ -1,0 +1,57 @@
+<div class="table-meta">
+    <span>총 {{ total_count }}건</span>
+</div>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>분류</th>
+                <th>상태</th>
+                <th>프로젝트</th>
+                <th>제목</th>
+                <th>라벨</th>
+                <th>업데이트</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.id }}</td>
+                <td><span class="badge badge-cat-{{ item.category.value }}">{{ item.category.value }}</span></td>
+                <td><span class="badge badge-st-{{ item.status.value }}">{{ item.status.value }}</span></td>
+                <td class="cell-repo">{{ item.github_repo }}</td>
+                <td>
+                    {% if item.github_issue_url %}
+                    <a href="{{ item.github_issue_url }}" target="_blank" class="item-link">
+                        {{ item.title }}
+                        {% if item.github_issue_number %}<span class="issue-num">#{{ item.github_issue_number }}</span>{% endif %}
+                    </a>
+                    {% else %}
+                    {{ item.title }}
+                    {% endif %}
+                </td>
+                <td class="cell-labels">{{ item.labels or '-' }}</td>
+                <td style="white-space:nowrap;">{{ item.updated_at.strftime('%m/%d %H:%M') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" style="text-align:center; color:#94a3b8; padding:24px;">업무 항목이 없습니다.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_count > 50 %}
+<div class="pagination">
+    {% if current_page > 1 %}
+    {% set prev_qs = "category=" ~ current_category ~ "&status=" ~ current_status ~ "&repo=" ~ current_repo ~ "&q=" ~ current_q ~ "&page=" ~ (current_page - 1) %}
+    <a href="{{ base_path }}/dashboard/work-items?{{ prev_qs }}">&laquo; 이전</a>
+    {% endif %}
+    <a class="active">{{ current_page }}</a>
+    <span style="align-self:center; font-size:12px; color:#94a3b8;">/ {{ ((total_count - 1) // 50) + 1 }}p</span>
+    {% if current_page * 50 < total_count %}
+    {% set next_qs = "category=" ~ current_category ~ "&status=" ~ current_status ~ "&repo=" ~ current_repo ~ "&q=" ~ current_q ~ "&page=" ~ (current_page + 1) %}
+    <a href="{{ base_path }}/dashboard/work-items?{{ next_qs }}">다음 &raquo;</a>
+    {% endif %}
+</div>
+{% endif %}

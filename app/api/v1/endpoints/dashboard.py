@@ -12,6 +12,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from ....core.config import settings, APP_VERSION
 from ....core.database import get_db
 from ....models.report import ReportType, ReportStatus
+from ....models.issue import WorkItem, ItemCategory, ItemStatus
 from ....services.report_service import get_report_service
 from ....services.stats_service import get_stats_service
 
@@ -115,6 +116,102 @@ def report_detail(report_id: int, db: Session = Depends(get_db)):
         "report_detail.html",
         report=report,
         active_page="reports",
+    )
+
+
+@router.get("/work-items", response_class=HTMLResponse)
+def work_items_page(
+    category: str = Query(default=None),
+    status: str = Query(default=None),
+    repo: str = Query(default=None),
+    q: str = Query(default=None),
+    group_by: str = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """업무 항목 목록 페이지"""
+    limit = 50
+    offset = (page - 1) * limit
+
+    query = db.query(WorkItem).order_by(WorkItem.updated_at.desc())
+
+    if category and category in ("planned", "required", "in_progress"):
+        query = query.filter(WorkItem.category == ItemCategory(category))
+    if status and status in ("open", "in_progress", "resolved", "closed"):
+        query = query.filter(WorkItem.status == ItemStatus(status))
+    if repo:
+        query = query.filter(WorkItem.github_repo == repo)
+    if q:
+        query = query.filter(WorkItem.title.ilike(f"%{q}%"))
+
+    total_count = query.count()
+    items = query.offset(offset).limit(limit).all()
+
+    # 프로젝트 목록 (필터 드롭다운용)
+    repos = [r[0] for r in db.query(WorkItem.github_repo).distinct().order_by(WorkItem.github_repo).all()]
+
+    # 프로젝트별 그룹 뷰
+    project_groups = None
+    if group_by == "project":
+        from collections import defaultdict
+        groups = defaultdict(list)
+        all_items = query.limit(500).all()
+        for item in all_items:
+            groups[item.github_repo].append(item)
+        project_groups = dict(sorted(groups.items(), key=lambda x: len(x[1]), reverse=True))
+
+    return _render(
+        "work_items.html",
+        items=items,
+        repos=repos,
+        current_category=category or "all",
+        current_status=status or "all",
+        current_repo=repo or "all",
+        current_q=q or "",
+        current_page=page,
+        total_count=total_count,
+        group_by=group_by,
+        project_groups=project_groups,
+        active_page="work_items",
+    )
+
+
+@router.get("/work-items/table", response_class=HTMLResponse)
+def work_items_table_partial(
+    category: str = Query(default=None),
+    status: str = Query(default=None),
+    repo: str = Query(default=None),
+    q: str = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    db: Session = Depends(get_db),
+):
+    """HTMX 파셜: 업무 항목 테이블"""
+    limit = 50
+    offset = (page - 1) * limit
+
+    query = db.query(WorkItem).order_by(WorkItem.updated_at.desc())
+
+    if category and category in ("planned", "required", "in_progress"):
+        query = query.filter(WorkItem.category == ItemCategory(category))
+    if status and status in ("open", "in_progress", "resolved", "closed"):
+        query = query.filter(WorkItem.status == ItemStatus(status))
+    if repo:
+        query = query.filter(WorkItem.github_repo == repo)
+    if q:
+        query = query.filter(WorkItem.title.ilike(f"%{q}%"))
+
+    total_count = query.count()
+    items = query.offset(offset).limit(limit).all()
+
+    return _render(
+        "partials/work_items_table.html",
+        items=items,
+        current_category=category or "all",
+        current_status=status or "all",
+        current_repo=repo or "all",
+        current_q=q or "",
+        current_page=page,
+        total_count=total_count,
     )
 
 
