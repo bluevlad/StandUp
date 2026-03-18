@@ -64,7 +64,7 @@ app/
 ## Do NOT
 - Oracle 문법 사용 금지 (NVL, SYSDATE, ROWNUM 등)
 - .env 파일을 git에 커밋 금지
-- docker-compose.production.yml을 개발 PC에서 수정 금지
+- docker-compose.production.yml을 개발 PC(Windows Desktop)에서 수정 금지 (운영 MacBook에서 SSH 직접 작업 시는 허용)
 - 운영 DB에 직접 DDL 실행 금지
 
 ## Database Notes
