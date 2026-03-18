@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Work Items{% endblock %}
+{% block page_title %}Work Items{% endblock %}
+{% block page_meta %}업무 항목 관리 ({{ total_count }}건){% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="filter-bar">
+    <div class="filter-group">
+        <label>분류</label>
+        <select id="filter-category" onchange="applyFilters()">
+            <option value="all" {% if current_category == 'all' %}selected{% endif %}>전체</option>
+            <option value="planned" {% if current_category == 'planned' %}selected{% endif %}>예정사항</option>
+            <option value="required" {% if current_category == 'required' %}selected{% endif %}>요구사항</option>
+            <option value="in_progress" {% if current_category == 'in_progress' %}selected{% endif %}>진행사항</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>상태</label>
+        <select id="filter-status" onchange="applyFilters()">
+            <option value="all" {% if current_status == 'all' %}selected{% endif %}>전체</option>
+            <option value="open" {% if current_status == 'open' %}selected{% endif %}>Open</option>
+            <option value="in_progress" {% if current_status == 'in_progress' %}selected{% endif %}>진행중</option>
+            <option value="resolved" {% if current_status == 'resolved' %}selected{% endif %}>완료</option>
+            <option value="closed" {% if current_status == 'closed' %}selected{% endif %}>종료</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>프로젝트</label>
+        <select id="filter-repo" onchange="applyFilters()">
+            <option value="all" {% if current_repo == 'all' %}selected{% endif %}>전체</option>
+            {% for r in repos %}
+            <option value="{{ r }}" {% if current_repo == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="filter-group">
+        <label>검색</label>
+        <input type="text" id="filter-q" value="{{ current_q }}" placeholder="제목 키워드..."
+               onkeydown="if(event.key==='Enter')applyFilters()">
+    </div>
+    <div class="filter-group" style="align-self:flex-end;">
+        <button onclick="applyFilters()" class="btn btn-primary">검색</button>
+        <button onclick="resetFilters()" class="btn btn-secondary">초기화</button>
+    </div>
+</div>
+
+{% if group_by == 'project' and project_groups %}
+<!-- Project Group View -->
+{% for repo_name, repo_items in project_groups.items() %}
+<div class="card" style="margin-bottom:12px;">
+    <div class="project-group-header" onclick="toggleGroup(this)">
+        <span class="toggle-icon">&#9654;</span>
+        <strong>{{ repo_name }}</strong>
+        <span class="badge badge-count">{{ repo_items | length }}건</span>
+    </div>
+    <div class="project-group-body" style="display:none;">
+        <table>
+            <thead>
+                <tr>
+                    <th>분류</th>
+                    <th>상태</th>
+                    <th>제목</th>
+                    <th>라벨</th>
+                    <th>업데이트</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in repo_items %}
+                <tr>
+                    <td><span class="badge badge-cat-{{ item.category.value }}">{{ item.category.value }}</span></td>
+                    <td><span class="badge badge-st-{{ item.status.value }}">{{ item.status.value }}</span></td>
+                    <td>
+                        {% if item.github_issue_url %}
+                        <a href="{{ item.github_issue_url }}" target="_blank" class="item-link">{{ item.title }}</a>
+                        {% else %}
+                        {{ item.title }}
+                        {% endif %}
+                    </td>
+                    <td class="cell-labels">{{ item.labels or '-' }}</td>
+                    <td style="white-space:nowrap;">{{ item.updated_at.strftime('%m/%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+
+{% else %}
+<!-- Table View -->
+<div class="card">
+    <div id="work-items-table">
+        {% include "partials/work_items_table.html" %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function buildQuery() {
+    var params = [];
+    var cat = document.getElementById('filter-category').value;
+    var st = document.getElementById('filter-status').value;
+    var repo = document.getElementById('filter-repo').value;
+    var q = document.getElementById('filter-q').value.trim();
+    if (cat !== 'all') params.push('category=' + encodeURIComponent(cat));
+    if (st !== 'all') params.push('status=' + encodeURIComponent(st));
+    if (repo !== 'all') params.push('repo=' + encodeURIComponent(repo));
+    if (q) params.push('q=' + encodeURIComponent(q));
+    return params.join('&');
+}
+
+function applyFilters() {
+    var qs = buildQuery();
+    location.href = '{{ base_path }}/dashboard/work-items' + (qs ? '?' + qs : '');
+}
+
+function resetFilters() {
+    location.href = '{{ base_path }}/dashboard/work-items';
+}
+
+function toggleGroup(el) {
+    var body = el.nextElementSibling;
+    var icon = el.querySelector('.toggle-icon');
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        icon.innerHTML = '&#9660;';
+    } else {
+        body.style.display = 'none';
+        icon.innerHTML = '&#9654;';
+    }
+}
+</script>
+{% endblock %}

@@ -17,26 +17,26 @@
 
 <!-- Summary Cards -->
 <div class="summary-grid">
-    <div class="summary-card blue">
+    <a href="{{ base_path }}/dashboard/work-items" class="summary-card blue">
         <div class="number">{{ summary.total_items }}</div>
         <div class="label">전체 업무</div>
-    </div>
-    <div class="summary-card green">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?status=resolved" class="summary-card green">
         <div class="number">{{ summary.completion_rate }}%</div>
         <div class="label">완료율</div>
-    </div>
-    <div class="summary-card amber">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?status=in_progress" class="summary-card amber">
         <div class="number">{{ summary.by_status.get('in_progress', 0) }}</div>
         <div class="label">진행중</div>
-    </div>
-    <div class="summary-card red">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?status=open" class="summary-card red">
         <div class="number">{{ summary.by_status.get('open', 0) }}</div>
         <div class="label">미완료(Open)</div>
-    </div>
-    <div class="summary-card slate">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?status=closed" class="summary-card slate">
         <div class="number">{{ summary.by_status.get('resolved', 0) + summary.by_status.get('closed', 0) }}</div>
         <div class="label">완료</div>
-    </div>
+    </a>
 </div>
 
 <!-- Trend Chart -->

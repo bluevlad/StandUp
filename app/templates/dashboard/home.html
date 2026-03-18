@@ -7,26 +7,26 @@
 {% block content %}
 <!-- Summary Cards -->
 <div class="summary-grid">
-    <div class="summary-card blue">
+    <a href="{{ base_path }}/dashboard/work-items" class="summary-card blue">
         <div class="number">{{ summary.total_items }}</div>
         <div class="label">전체 업무</div>
-    </div>
-    <div class="summary-card green">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?status=resolved" class="summary-card green">
         <div class="number">{{ summary.completion_rate }}%</div>
         <div class="label">완료율</div>
-    </div>
-    <div class="summary-card amber">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?category=in_progress" class="summary-card amber">
         <div class="number">{{ summary.by_category.get('in_progress', 0) }}</div>
         <div class="label">진행중</div>
-    </div>
-    <div class="summary-card red">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?category=required" class="summary-card red">
         <div class="number">{{ summary.by_category.get('required', 0) }}</div>
         <div class="label">요구사항</div>
-    </div>
-    <div class="summary-card slate">
+    </a>
+    <a href="{{ base_path }}/dashboard/work-items?group_by=project" class="summary-card slate">
         <div class="number">{{ summary.project_count }}</div>
         <div class="label">프로젝트</div>
-    </div>
+    </a>
 </div>
 
 <!-- Recent Reports -->
