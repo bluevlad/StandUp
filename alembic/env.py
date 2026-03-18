@@ -21,7 +21,7 @@ from app.models import (  # noqa: F401
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # .env의 DATABASE_URL로 alembic.ini 설정 오버라이드
 database_url = os.environ.get("DATABASE_URL")
