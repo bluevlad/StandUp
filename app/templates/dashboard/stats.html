@@ -7,11 +7,11 @@
 {% block content %}
 <!-- Period Tabs -->
 <div class="tab-bar">
-    <a href="/dashboard/stats?period_type=daily"
+    <a href="{{ base_path }}/dashboard/stats?period_type=daily"
        class="{% if current_period == 'daily' %}active{% endif %}">일별</a>
-    <a href="/dashboard/stats?period_type=weekly"
+    <a href="{{ base_path }}/dashboard/stats?period_type=weekly"
        class="{% if current_period == 'weekly' %}active{% endif %}">주별</a>
-    <a href="/dashboard/stats?period_type=monthly"
+    <a href="{{ base_path }}/dashboard/stats?period_type=monthly"
        class="{% if current_period == 'monthly' %}active{% endif %}">월별</a>
 </div>
 

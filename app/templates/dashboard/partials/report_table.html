@@ -15,7 +15,7 @@
         </thead>
         <tbody>
             {% for r in reports %}
-            <tr onclick="location.href='/dashboard/reports/{{ r.id }}'">
+            <tr onclick="location.href='{{ base_path }}/dashboard/reports/{{ r.id }}'">
                 <td>{{ r.id }}</td>
                 <td><span class="badge badge-{{ r.report_type.value }}">{{ r.report_type.value }}</span></td>
                 <td>{{ r.subject }}</td>
@@ -36,13 +36,13 @@
 {% if reports | length >= 20 %}
 <div class="pagination">
     {% if current_page > 1 %}
-    <a href="/dashboard/reports?report_type={{ current_type }}&page={{ current_page - 1 }}"
-       hx-get="/dashboard/reports/table?report_type={{ current_type }}&page={{ current_page - 1 }}"
+    <a href="{{ base_path }}/dashboard/reports?report_type={{ current_type }}&page={{ current_page - 1 }}"
+       hx-get="{{ base_path }}/dashboard/reports/table?report_type={{ current_type }}&page={{ current_page - 1 }}"
        hx-target="#report-table">&laquo; 이전</a>
     {% endif %}
     <a class="active">{{ current_page }}</a>
-    <a href="/dashboard/reports?report_type={{ current_type }}&page={{ current_page + 1 }}"
-       hx-get="/dashboard/reports/table?report_type={{ current_type }}&page={{ current_page + 1 }}"
+    <a href="{{ base_path }}/dashboard/reports?report_type={{ current_type }}&page={{ current_page + 1 }}"
+       hx-get="{{ base_path }}/dashboard/reports/table?report_type={{ current_type }}&page={{ current_page + 1 }}"
        hx-target="#report-table">다음 &raquo;</a>
 </div>
 {% endif %}

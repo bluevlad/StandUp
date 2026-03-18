@@ -7,23 +7,23 @@
 {% block content %}
 <!-- Type Tabs -->
 <div class="tab-bar">
-    <a href="/dashboard/reports"
-       hx-get="/dashboard/reports/table"
+    <a href="{{ base_path }}/dashboard/reports"
+       hx-get="{{ base_path }}/dashboard/reports/table"
        hx-target="#report-table"
        hx-indicator="#loading"
        class="{% if current_type == 'all' %}active{% endif %}">전체</a>
-    <a href="/dashboard/reports?report_type=daily"
-       hx-get="/dashboard/reports/table?report_type=daily"
+    <a href="{{ base_path }}/dashboard/reports?report_type=daily"
+       hx-get="{{ base_path }}/dashboard/reports/table?report_type=daily"
        hx-target="#report-table"
        hx-indicator="#loading"
        class="{% if current_type == 'daily' %}active{% endif %}">일일</a>
-    <a href="/dashboard/reports?report_type=weekly"
-       hx-get="/dashboard/reports/table?report_type=weekly"
+    <a href="{{ base_path }}/dashboard/reports?report_type=weekly"
+       hx-get="{{ base_path }}/dashboard/reports/table?report_type=weekly"
        hx-target="#report-table"
        hx-indicator="#loading"
        class="{% if current_type == 'weekly' %}active{% endif %}">주간</a>
-    <a href="/dashboard/reports?report_type=monthly"
-       hx-get="/dashboard/reports/table?report_type=monthly"
+    <a href="{{ base_path }}/dashboard/reports?report_type=monthly"
+       hx-get="{{ base_path }}/dashboard/reports/table?report_type=monthly"
        hx-target="#report-table"
        hx-indicator="#loading"
        class="{% if current_type == 'monthly' %}active{% endif %}">월간</a>
