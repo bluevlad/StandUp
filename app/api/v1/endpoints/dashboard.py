@@ -137,7 +137,9 @@ def work_items_page(
 
     if category and category in ("planned", "required", "in_progress"):
         query = query.filter(WorkItem.category == ItemCategory(category))
-    if status and status in ("open", "in_progress", "resolved", "closed"):
+    if status == "completed":
+        query = query.filter(WorkItem.status.in_([ItemStatus.RESOLVED, ItemStatus.CLOSED]))
+    elif status and status in ("open", "in_progress", "resolved", "closed"):
         query = query.filter(WorkItem.status == ItemStatus(status))
     if repo:
         query = query.filter(WorkItem.github_repo == repo)
@@ -193,7 +195,9 @@ def work_items_table_partial(
 
     if category and category in ("planned", "required", "in_progress"):
         query = query.filter(WorkItem.category == ItemCategory(category))
-    if status and status in ("open", "in_progress", "resolved", "closed"):
+    if status == "completed":
+        query = query.filter(WorkItem.status.in_([ItemStatus.RESOLVED, ItemStatus.CLOSED]))
+    elif status and status in ("open", "in_progress", "resolved", "closed"):
         query = query.filter(WorkItem.status == ItemStatus(status))
     if repo:
         query = query.filter(WorkItem.github_repo == repo)

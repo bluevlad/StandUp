@@ -22,6 +22,7 @@
             <option value="all" {% if current_status == 'all' %}selected{% endif %}>전체</option>
             <option value="open" {% if current_status == 'open' %}selected{% endif %}>Open</option>
             <option value="in_progress" {% if current_status == 'in_progress' %}selected{% endif %}>진행중</option>
+            <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>완료(전체)</option>
             <option value="resolved" {% if current_status == 'resolved' %}selected{% endif %}>완료</option>
             <option value="closed" {% if current_status == 'closed' %}selected{% endif %}>종료</option>
         </select>
