@@ -27,6 +27,7 @@ _jinja_env = Environment(
 
 def _render(template_name: str, **kwargs) -> HTMLResponse:
     kwargs.setdefault("app_version", APP_VERSION)
+    kwargs.setdefault("base_path", settings.root_path)
     template = _jinja_env.get_template(template_name)
     html = template.render(**kwargs)
     return HTMLResponse(content=html)

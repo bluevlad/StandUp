@@ -288,16 +288,16 @@
             <small>v{{ app_version }}</small>
         </div>
         <div class="sidebar-nav">
-            <a href="/dashboard" class="{% if active_page == 'home' %}active{% endif %}">
+            <a href="{{ base_path }}/dashboard" class="{% if active_page == 'home' %}active{% endif %}">
                 <span class="icon">&#9776;</span> Dashboard
             </a>
-            <a href="/dashboard/reports" class="{% if active_page == 'reports' %}active{% endif %}">
+            <a href="{{ base_path }}/dashboard/reports" class="{% if active_page == 'reports' %}active{% endif %}">
                 <span class="icon">&#9993;</span> Reports
             </a>
-            <a href="/dashboard/stats" class="{% if active_page == 'stats' %}active{% endif %}">
+            <a href="{{ base_path }}/dashboard/stats" class="{% if active_page == 'stats' %}active{% endif %}">
                 <span class="icon">&#9733;</span> Statistics
             </a>
-            <a href="/docs" target="_blank">
+            <a href="{{ base_path }}/docs" target="_blank">
                 <span class="icon">&#128196;</span> API Docs
             </a>
         </div>
