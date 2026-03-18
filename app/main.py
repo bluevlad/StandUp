@@ -31,6 +31,8 @@ async def lifespan(app: FastAPI):
         alembic_cfg = AlembicConfig(str(settings.BASE_DIR / "alembic.ini"))
         alembic_cfg.set_main_option("sqlalchemy.url", settings.database_url)
         alembic_command.upgrade(alembic_cfg, "head")
+        # Alembic이 logging.config.fileConfig()로 root logger를 덮어쓰므로 재설정
+        setup_logging()
         logger.info("DB 마이그레이션 완료")
     except Exception as e:
         logger.error(f"DB 마이그레이션 실패: {e}", exc_info=True)
