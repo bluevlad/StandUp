@@ -5,8 +5,10 @@ from .git_provider import GitProvider, ProviderType
 from .repository import Repository
 from .recipient import Recipient
 from .app_setting import AppSetting
+from .dev_plan import DevPlan, DevPlanItem, PlanStatus, PlanItemStatus, PlanItemPriority
 
 __all__ = [
     "WorkItem", "Report", "ReportItem", "AgentLog",
     "GitProvider", "ProviderType", "Repository", "Recipient", "AppSetting",
+    "DevPlan", "DevPlanItem", "PlanStatus", "PlanItemStatus", "PlanItemPriority",
 ]

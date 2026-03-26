@@ -18,7 +18,7 @@ from alembic import command as alembic_command
 from .core.config import settings, APP_VERSION
 from .core.logging_config import setup_logging
 from .core.scheduler import setup_scheduler, shutdown_scheduler
-from .api.v1.endpoints import health, reports, work_items, config, stats, dashboard
+from .api.v1.endpoints import health, reports, work_items, config, stats, dashboard, dev_plans
 
 # 로깅 설정 (파일 + 콘솔)
 setup_logging()
@@ -65,6 +65,7 @@ app.include_router(reports.router, prefix="/api/v1")
 app.include_router(work_items.router, prefix="/api/v1")
 app.include_router(config.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
+app.include_router(dev_plans.router, prefix="/api/v1")
 app.include_router(dashboard.router)
 
 # 서비스 소개 페이지 (intro.html) 정적 자산

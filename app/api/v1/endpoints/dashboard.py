@@ -15,6 +15,8 @@ from ....models.report import ReportType, ReportStatus
 from ....models.issue import WorkItem, ItemCategory, ItemStatus
 from ....services.report_service import get_report_service
 from ....services.stats_service import get_stats_service
+from ....services.dev_plan_service import get_dev_plan_service
+from ....models.dev_plan import DevPlan, PlanStatus, PlanItemStatus
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -237,4 +239,57 @@ def stats_page(
         report_stats=report_stats,
         current_period=period_type,
         active_page="stats",
+    )
+
+
+@router.get("/dev-plans", response_class=HTMLResponse)
+def dev_plans_page(db: Session = Depends(get_db)):
+    """개발 플랜 현황 페이지"""
+    service = get_dev_plan_service()
+    overall = service.get_overall_metrics(db)
+    projects = service.get_project_summary(db)
+
+    # 프로젝트별 플랜 목록 (상세 링크용)
+    from sqlalchemy.orm import joinedload
+    all_plans = (
+        db.query(DevPlan)
+        .filter(DevPlan.status.in_([PlanStatus.ACTIVE, PlanStatus.COMPLETED]))
+        .order_by(DevPlan.project_name, DevPlan.updated_at.desc())
+        .all()
+    )
+    plans_by_project: dict[str, list] = {}
+    for plan in all_plans:
+        plans_by_project.setdefault(plan.project_name, []).append(plan)
+
+    return _render(
+        "dev_plans.html",
+        overall=overall,
+        projects=projects,
+        plans_by_project=plans_by_project,
+        active_page="dev_plans",
+    )
+
+
+@router.get("/dev-plans/{plan_id}", response_class=HTMLResponse)
+def dev_plan_detail(plan_id: int, db: Session = Depends(get_db)):
+    """개발 플랜 상세 페이지"""
+    service = get_dev_plan_service()
+    plan = service.get_plan(db, plan_id)
+    if not plan:
+        return HTMLResponse(content="<h1>404 - 플랜을 찾을 수 없습니다</h1>", status_code=404)
+
+    # Phase별 그룹핑
+    from collections import OrderedDict
+    phases: dict[int, list] = OrderedDict()
+    for item in plan.items:
+        phases.setdefault(item.phase, []).append(item)
+
+    done_count = sum(1 for item in plan.items if item.status == PlanItemStatus.DONE)
+
+    return _render(
+        "dev_plan_detail.html",
+        plan=plan,
+        phases=phases,
+        done_count=done_count,
+        active_page="dev_plans",
     )

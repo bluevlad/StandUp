@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Dev Plans{% endblock %}
+{% block page_title %}Dev Plans{% endblock %}
+{% block page_meta %}프로젝트별 개발 플랜 현황{% endblock %}
+
+{% block content %}
+<style>
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .metric-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .metric-card .value {
+        font-size: 28px;
+        font-weight: bold;
+        line-height: 1;
+    }
+    .metric-card .label {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 6px;
+    }
+    .project-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        margin-bottom: 16px;
+        overflow: hidden;
+        transition: box-shadow 0.15s;
+    }
+    .project-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .project-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid #f1f5f9;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+    }
+    .project-header:hover { background: #f8fafc; }
+    .project-name {
+        font-size: 15px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .project-plan-title {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+    .project-badges {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .metric-badge {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 11px;
+    }
+    .metric-badge .val {
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+    .metric-badge .lbl {
+        font-size: 10px;
+        opacity: 0.8;
+    }
+    .mb-progress { background: #dbeafe; color: #1e40af; }
+    .mb-completion { background: #dcfce7; color: #166534; }
+    .mb-quality { background: #fef3c7; color: #92400e; }
+    .mb-none { background: #f1f5f9; color: #94a3b8; }
+    .project-body {
+        padding: 16px 20px;
+    }
+    .phase-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+        font-size: 13px;
+        border-bottom: 1px solid #f8fafc;
+    }
+    .phase-row:last-child { border-bottom: none; }
+    .phase-label {
+        min-width: 160px;
+        font-weight: 500;
+        color: #334155;
+    }
+    .phase-bar-wrap {
+        flex: 1;
+        height: 20px;
+        background: #f1f5f9;
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
+    }
+    .phase-bar {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.5s ease;
+    }
+    .phase-bar.progress-bar { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .phase-bar.completion-bar { background: linear-gradient(90deg, #16a34a, #4ade80); }
+    .phase-stats {
+        min-width: 100px;
+        text-align: right;
+        font-size: 12px;
+        color: #64748b;
+    }
+    .no-plan-msg {
+        padding: 12px 20px;
+        color: #94a3b8;
+        font-size: 13px;
+        text-align: center;
+    }
+    .items-count {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-left: 8px;
+    }
+    .plan-status-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .plan-status-active { background: #dcfce7; color: #166534; }
+    .plan-status-draft { background: #f1f5f9; color: #64748b; }
+    .plan-status-completed { background: #dbeafe; color: #1e40af; }
+    .plan-status-archived { background: #fee2e2; color: #991b1b; }
+</style>
+
+<!-- Overall Metrics -->
+<div class="metrics-grid">
+    <div class="metric-card" style="border-top: 3px solid #2563eb;">
+        <div class="value" style="color:#2563eb;">{{ overall.total_projects }}</div>
+        <div class="label">전체 프로젝트</div>
+    </div>
+    <div class="metric-card" style="border-top: 3px solid #16a34a;">
+        <div class="value" style="color:#16a34a;">{{ overall.active_projects }}</div>
+        <div class="label">활성 프로젝트</div>
+    </div>
+    <div class="metric-card" style="border-top: 3px solid #3b82f6;">
+        <div class="value" style="color:#3b82f6;">{{ overall.avg_progress }}%</div>
+        <div class="label">평균 진행률</div>
+    </div>
+    <div class="metric-card" style="border-top: 3px solid #16a34a;">
+        <div class="value" style="color:#16a34a;">{{ overall.avg_completion }}%</div>
+        <div class="label">평균 완료율</div>
+    </div>
+    <div class="metric-card" style="border-top: 3px solid #d97706;">
+        <div class="value" style="color:#d97706;">{{ overall.avg_quality }}%</div>
+        <div class="label">평균 품질</div>
+    </div>
+    <div class="metric-card" style="border-top: 3px solid #64748b;">
+        <div class="value" style="color:#1e293b;">{{ overall.total_items }}</div>
+        <div class="label">전체 항목</div>
+    </div>
+    <div class="metric-card" style="border-top: 3px solid #16a34a;">
+        <div class="value" style="color:#16a34a;">{{ overall.done_items }}</div>
+        <div class="label">완료 항목</div>
+    </div>
+</div>
+
+<!-- Project Cards -->
+{% for project in projects %}
+<div class="project-card">
+    <div class="project-header" onclick="toggleProject('proj-{{ loop.index }}')">
+        <div>
+            <div class="project-name">
+                {{ project.project_name }}
+                <span class="items-count">{{ project.total_items }}개 항목</span>
+            </div>
+            {% if project.active_plan_title %}
+            <div class="project-plan-title">{{ project.active_plan_title }}</div>
+            {% endif %}
+        </div>
+        <div class="project-badges">
+            {% if project.plan_count > 0 %}
+            <div class="metric-badge mb-progress">
+                <span class="val">{{ project.progress_pct }}%</span>
+                <span class="lbl">진행률</span>
+            </div>
+            <div class="metric-badge mb-completion">
+                <span class="val">{{ project.completion_pct }}%</span>
+                <span class="lbl">완료율</span>
+            </div>
+            <div class="metric-badge mb-quality">
+                <span class="val">{{ project.quality_score }}%</span>
+                <span class="lbl">품질</span>
+            </div>
+            {% else %}
+            <div class="metric-badge mb-none">
+                <span class="val">-</span>
+                <span class="lbl">플랜 없음</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="project-body" id="proj-{{ loop.index }}" style="display:none;">
+        {% if project.phases %}
+        {% for phase in project.phases %}
+        <div class="phase-row">
+            <div class="phase-label">
+                Phase {{ phase.phase }}
+                {% if phase.phase_title %}: {{ phase.phase_title }}{% endif %}
+            </div>
+            <div class="phase-bar-wrap" title="진행률 {{ phase.progress_pct }}%">
+                <div class="phase-bar progress-bar" style="width:{{ phase.progress_pct }}%;"></div>
+            </div>
+            <div class="phase-stats">
+                {{ phase.done_items }}/{{ phase.total_items }}
+                ({{ phase.completion_pct }}%)
+            </div>
+        </div>
+        {% endfor %}
+        <div style="margin-top:12px; text-align:right;">
+            {% for plan in plans_by_project.get(project.project_name, []) %}
+            <a href="{{ base_path }}/dashboard/dev-plans/{{ plan.id }}"
+               style="font-size:12px; color:#2563eb; text-decoration:none; margin-left:12px;">
+                {{ plan.title }}
+                <span class="plan-status-badge plan-status-{{ plan.status.value }}">{{ plan.status.value }}</span>
+                &rarr;
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-plan-msg">등록된 개발 플랜이 없습니다.</div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleProject(id) {
+    var el = document.getElementById(id);
+    if (el.style.display === 'none') {
+        el.style.display = 'block';
+    } else {
+        el.style.display = 'none';
+    }
+}
+
+// 첫 번째 활성 프로젝트 자동 펼치기
+document.addEventListener('DOMContentLoaded', function() {
+    var projects = {{ projects | tojson }};
+    for (var i = 0; i < projects.length; i++) {
+        if (projects[i].plan_count > 0) {
+            var el = document.getElementById('proj-' + (i + 1));
+            if (el) el.style.display = 'block';
+            break;
+        }
+    }
+});
+</script>
+{% endblock %}
