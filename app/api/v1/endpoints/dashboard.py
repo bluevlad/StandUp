@@ -293,3 +293,122 @@ def dev_plan_detail(plan_id: int, db: Session = Depends(get_db)):
         done_count=done_count,
         active_page="dev_plans",
     )
+
+
+@router.get("/projects", response_class=HTMLResponse)
+def projects_overview(db: Session = Depends(get_db)):
+    """프로젝트 Overview 페이지"""
+    stats_svc = get_stats_service()
+    dev_plan_svc = get_dev_plan_service()
+
+    work_stats = stats_svc.get_all_projects_overview(db)
+    plan_summary = dev_plan_svc.get_project_summary(db)
+    overall = dev_plan_svc.get_overall_metrics(db)
+
+    # work_stats + plan_summary 병합
+    plan_map = {p["project_name"]: p for p in plan_summary}
+    projects = []
+    for ws in work_stats:
+        ps = plan_map.get(ws["project_name"], {})
+        projects.append({
+            **ws,
+            "progress_pct": ps.get("progress_pct", 0.0),
+            "completion_pct": ps.get("completion_pct", 0.0),
+            "quality_score": ps.get("quality_score", 0.0),
+            "plan_count": ps.get("plan_count", 0),
+            "plan_total_items": ps.get("total_items", 0),
+            "plan_done_items": ps.get("done_items", 0),
+            "active_plan_title": ps.get("active_plan_title"),
+            "current_phase": 0,
+            "total_phases": 0,
+        })
+        # 활성 플랜의 phase 정보 추가
+        if ps.get("plan_count", 0) > 0:
+            active_plan = (
+                db.query(DevPlan)
+                .filter(DevPlan.project_name == ws["project_name"], DevPlan.status == PlanStatus.ACTIVE)
+                .first()
+            )
+            if active_plan:
+                projects[-1]["current_phase"] = active_plan.current_phase
+                projects[-1]["total_phases"] = active_plan.total_phases
+
+    # 전체 Work Items 종합
+    total_work_items = sum(p["total_items"] for p in projects)
+    total_resolved = sum(p["resolved_count"] for p in projects)
+    total_in_progress = sum(p["in_progress_count"] for p in projects)
+    total_open = sum(p["open_count"] for p in projects)
+    overall_completion = round((total_resolved / total_work_items * 100), 1) if total_work_items > 0 else 0.0
+
+    return _render(
+        "project_overview.html",
+        projects=projects,
+        overall=overall,
+        total_work_items=total_work_items,
+        total_resolved=total_resolved,
+        total_in_progress=total_in_progress,
+        total_open=total_open,
+        overall_completion=overall_completion,
+        active_page="projects",
+    )
+
+
+@router.get("/projects/{project_name}", response_class=HTMLResponse)
+def project_detail(
+    project_name: str,
+    period_type: str = Query(default="weekly", pattern="^(daily|weekly|monthly)$"),
+    db: Session = Depends(get_db),
+):
+    """프로젝트 상세 통계 페이지"""
+    stats_svc = get_stats_service()
+    dev_plan_svc = get_dev_plan_service()
+
+    # TARGET_PROJECTS에서 repo 찾기
+    from ....services.dev_plan_service import TARGET_PROJECTS
+    proj_info = next((p for p in TARGET_PROJECTS if p["name"] == project_name), None)
+    if not proj_info:
+        return HTMLResponse(content="<h1>404 - 프로젝트를 찾을 수 없습니다</h1>", status_code=404)
+
+    github_repo = proj_info["repo"]
+
+    # Work Items 통계
+    work_stats = stats_svc.get_project_work_stats(db, github_repo)
+
+    # Work Items 추이
+    trend = stats_svc.get_project_trend(db, github_repo, period_type)
+
+    # Dev Plan 정보
+    plan_projects = dev_plan_svc.get_project_summary(db)
+    plan_info = next((p for p in plan_projects if p["project_name"] == project_name), {})
+
+    # 해당 프로젝트의 플랜 목록
+    from sqlalchemy.orm import joinedload
+    plans = (
+        db.query(DevPlan)
+        .options(joinedload(DevPlan.items))
+        .filter(DevPlan.project_name == project_name)
+        .order_by(DevPlan.updated_at.desc())
+        .all()
+    )
+
+    # 전체 Work Items 목록 (최근 20건)
+    all_items = (
+        db.query(WorkItem)
+        .filter(WorkItem.github_repo == github_repo)
+        .order_by(WorkItem.updated_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    return _render(
+        "project_detail.html",
+        project_name=project_name,
+        github_repo=github_repo,
+        work_stats=work_stats,
+        trend=trend,
+        plan_info=plan_info,
+        plans=plans,
+        all_items=all_items,
+        current_period=period_type,
+        active_page="projects",
+    )
