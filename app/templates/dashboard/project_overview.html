@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Projects{% endblock %}
+{% block page_title %}Projects{% endblock %}
+{% block page_meta %}8개 프로젝트 업무현황 종합{% endblock %}
+
+{% block content %}
+<style>
+    .overview-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .ov-metric {
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .ov-metric .val {
+        font-size: 28px;
+        font-weight: bold;
+        line-height: 1;
+    }
+    .ov-metric .lbl {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 6px;
+    }
+
+    .proj-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 16px;
+    }
+    .proj-card {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        overflow: hidden;
+        transition: box-shadow 0.15s, transform 0.15s;
+        display: flex;
+        flex-direction: column;
+    }
+    .proj-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .proj-card-link {
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .proj-card-head {
+        padding: 18px 20px 12px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .proj-card-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    .proj-card-repo {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+    .proj-card-plan-title {
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 4px;
+    }
+    .proj-card-body {
+        padding: 14px 20px;
+        flex: 1;
+    }
+
+    /* Issue 통계 */
+    .issue-stats {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+    }
+    .issue-stat {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .is-total { background: #f1f5f9; color: #475569; }
+    .is-open { background: #fee2e2; color: #991b1b; }
+    .is-progress { background: #fef3c7; color: #92400e; }
+    .is-done { background: #dcfce7; color: #166534; }
+
+    /* 진행률 바 */
+    .progress-section { margin-bottom: 10px; }
+    .progress-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+        font-size: 12px;
+    }
+    .progress-label {
+        min-width: 50px;
+        color: #64748b;
+        font-weight: 500;
+    }
+    .progress-bar-wrap {
+        flex: 1;
+        height: 8px;
+        background: #f1f5f9;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .progress-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    .pb-progress { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .pb-completion { background: linear-gradient(90deg, #16a34a, #4ade80); }
+    .pb-quality { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .progress-val {
+        min-width: 40px;
+        text-align: right;
+        font-weight: 600;
+        font-size: 12px;
+    }
+
+    /* Phase 정보 */
+    .proj-card-footer {
+        padding: 10px 20px;
+        background: #f8fafc;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #64748b;
+    }
+    .phase-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: #e0e7ff;
+        color: #3730a3;
+        font-size: 10px;
+        font-weight: 600;
+    }
+    .arrow-link {
+        color: #2563eb;
+        font-weight: 600;
+    }
+
+    .no-plan-label {
+        font-size: 12px;
+        color: #94a3b8;
+        padding: 2px 8px;
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+
+    @media (max-width: 768px) {
+        .proj-grid { grid-template-columns: 1fr; }
+    }
+</style>
+
+<!-- Overall Metrics -->
+<div class="overview-metrics">
+    <div class="ov-metric" style="border-top: 3px solid #2563eb;">
+        <div class="val" style="color:#2563eb;">{{ projects | length }}</div>
+        <div class="lbl">전체 프로젝트</div>
+    </div>
+    <div class="ov-metric" style="border-top: 3px solid #475569;">
+        <div class="val" style="color:#475569;">{{ total_work_items }}</div>
+        <div class="lbl">전체 Issues</div>
+    </div>
+    <div class="ov-metric" style="border-top: 3px solid #16a34a;">
+        <div class="val" style="color:#16a34a;">{{ total_resolved }}</div>
+        <div class="lbl">완료</div>
+    </div>
+    <div class="ov-metric" style="border-top: 3px solid #d97706;">
+        <div class="val" style="color:#d97706;">{{ total_in_progress }}</div>
+        <div class="lbl">진행중</div>
+    </div>
+    <div class="ov-metric" style="border-top: 3px solid #dc2626;">
+        <div class="val" style="color:#dc2626;">{{ total_open }}</div>
+        <div class="lbl">Open</div>
+    </div>
+    <div class="ov-metric" style="border-top: 3px solid #16a34a;">
+        <div class="val" style="color:#16a34a;">{{ overall_completion }}%</div>
+        <div class="lbl">Issues 완료율</div>
+    </div>
+    <div class="ov-metric" style="border-top: 3px solid #3b82f6;">
+        <div class="val" style="color:#3b82f6;">{{ overall.avg_progress }}%</div>
+        <div class="lbl">평균 Plan 진행률</div>
+    </div>
+    <div class="ov-metric" style="border-top: 3px solid #d97706;">
+        <div class="val" style="color:#d97706;">{{ overall.avg_quality }}%</div>
+        <div class="lbl">평균 품질</div>
+    </div>
+</div>
+
+<!-- Project Cards Grid -->
+<div class="proj-grid">
+{% for p in projects %}
+    <div class="proj-card">
+        <a href="{{ base_path }}/dashboard/projects/{{ p.project_name }}" class="proj-card-link">
+            <div class="proj-card-head">
+                <div class="proj-card-name">{{ p.project_name }}</div>
+                <div class="proj-card-repo">{{ p.github_repo }}</div>
+                {% if p.active_plan_title %}
+                <div class="proj-card-plan-title">{{ p.active_plan_title }}</div>
+                {% endif %}
+            </div>
+            <div class="proj-card-body">
+                <!-- Issue Stats -->
+                <div class="issue-stats">
+                    <span class="issue-stat is-total">Issues {{ p.total_items }}</span>
+                    <span class="issue-stat is-open">Open {{ p.open_count }}</span>
+                    <span class="issue-stat is-progress">진행 {{ p.in_progress_count }}</span>
+                    <span class="issue-stat is-done">완료 {{ p.resolved_count }}</span>
+                </div>
+
+                <!-- Dev Plan Progress Bars -->
+                {% if p.plan_count > 0 %}
+                <div class="progress-section">
+                    <div class="progress-row">
+                        <span class="progress-label">진행률</span>
+                        <div class="progress-bar-wrap">
+                            <div class="progress-bar-fill pb-progress" style="width:{{ p.progress_pct }}%;"></div>
+                        </div>
+                        <span class="progress-val" style="color:#3b82f6;">{{ p.progress_pct }}%</span>
+                    </div>
+                    <div class="progress-row">
+                        <span class="progress-label">완료율</span>
+                        <div class="progress-bar-wrap">
+                            <div class="progress-bar-fill pb-completion" style="width:{{ p.completion_pct }}%;"></div>
+                        </div>
+                        <span class="progress-val" style="color:#16a34a;">{{ p.completion_pct }}%</span>
+                    </div>
+                    <div class="progress-row">
+                        <span class="progress-label">품질</span>
+                        <div class="progress-bar-wrap">
+                            <div class="progress-bar-fill pb-quality" style="width:{{ p.quality_score }}%;"></div>
+                        </div>
+                        <span class="progress-val" style="color:#d97706;">{{ p.quality_score }}%</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="proj-card-footer">
+                {% if p.plan_count > 0 %}
+                <span>
+                    <span class="phase-tag">Phase {{ p.current_phase }}/{{ p.total_phases }}</span>
+                    Plan {{ p.plan_done_items }}/{{ p.plan_total_items }} 항목
+                </span>
+                {% else %}
+                <span class="no-plan-label">Plan 없음</span>
+                {% endif %}
+                <span class="arrow-link">상세보기 &rarr;</span>
+            </div>
+        </a>
+    </div>
+{% endfor %}
+</div>
+{% endblock %}
