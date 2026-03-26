@@ -38,17 +38,42 @@ def _render(template_name: str, **kwargs) -> HTMLResponse:
 
 @router.get("", response_class=HTMLResponse)
 def dashboard_home(db: Session = Depends(get_db)):
-    """대시보드 메인 (최근 보고서 + 요약)"""
+    """대시보드 메인 (최근 보고서 + 프로젝트 현황)"""
     service = get_report_service()
     stats_svc = get_stats_service()
+    dev_plan_svc = get_dev_plan_service()
 
     recent_reports = service.get_reports(db, limit=5)
-    summary = stats_svc.get_summary(db, period_type="daily")
+
+    # TARGET_PROJECTS 기준 전체 기간 요약
+    summary = stats_svc.get_target_projects_summary(db)
+
+    # 프로젝트별 Work Items + Dev Plan 통합 데이터
+    work_stats = stats_svc.get_all_projects_overview(db)
+    plan_summary = dev_plan_svc.get_project_summary(db)
+    overall = dev_plan_svc.get_overall_metrics(db)
+
+    plan_map = {p["project_name"]: p for p in plan_summary}
+    projects = []
+    for ws in work_stats:
+        ps = plan_map.get(ws["project_name"], {})
+        projects.append({
+            **ws,
+            "progress_pct": ps.get("progress_pct", 0.0),
+            "completion_pct": ps.get("completion_pct", 0.0),
+            "quality_score": ps.get("quality_score", 0.0),
+            "plan_count": ps.get("plan_count", 0),
+            "plan_total_items": ps.get("total_items", 0),
+            "plan_done_items": ps.get("done_items", 0),
+            "active_plan_title": ps.get("active_plan_title"),
+        })
 
     return _render(
         "home.html",
         recent_reports=recent_reports,
         summary=summary,
+        overall=overall,
+        projects=projects,
         active_page="home",
     )
 
@@ -370,12 +395,13 @@ def project_detail(
         return HTMLResponse(content="<h1>404 - 프로젝트를 찾을 수 없습니다</h1>", status_code=404)
 
     github_repo = proj_info["repo"]
+    repo_name = proj_info.get("repo_name", proj_info["name"])
 
-    # Work Items 통계
-    work_stats = stats_svc.get_project_work_stats(db, github_repo)
+    # Work Items 통계 (repo_name으로 매칭)
+    work_stats = stats_svc.get_project_work_stats(db, repo_name)
 
     # Work Items 추이
-    trend = stats_svc.get_project_trend(db, github_repo, period_type)
+    trend = stats_svc.get_project_trend(db, repo_name, period_type)
 
     # Dev Plan 정보
     plan_projects = dev_plan_svc.get_project_summary(db)
@@ -394,7 +420,7 @@ def project_detail(
     # 전체 Work Items 목록 (최근 20건)
     all_items = (
         db.query(WorkItem)
-        .filter(WorkItem.github_repo == github_repo)
+        .filter(WorkItem.github_repo == repo_name)
         .order_by(WorkItem.updated_at.desc())
         .limit(20)
         .all()
@@ -404,6 +430,7 @@ def project_detail(
         "project_detail.html",
         project_name=project_name,
         github_repo=github_repo,
+        repo_name=repo_name,
         work_stats=work_stats,
         trend=trend,
         plan_info=plan_info,

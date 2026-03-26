@@ -221,6 +221,36 @@ class StatsService:
     # Project Overview 통계
     # ------------------------------------------------------------------
 
+    def get_target_projects_summary(self, db: Session) -> dict:
+        """TARGET_PROJECTS 8개 기준 전체 기간 요약 통계 (Dashboard 홈용)"""
+        from ..services.dev_plan_service import TARGET_PROJECTS
+
+        target_repo_names = [p.get("repo_name", p["name"]) for p in TARGET_PROJECTS]
+
+        items = (
+            db.query(WorkItem)
+            .filter(WorkItem.github_repo.in_(target_repo_names))
+            .all()
+        )
+
+        total = len(items)
+        by_category = {}
+        by_status = {}
+        for item in items:
+            by_category[item.category.value] = by_category.get(item.category.value, 0) + 1
+            by_status[item.status.value] = by_status.get(item.status.value, 0) + 1
+
+        resolved = by_status.get("resolved", 0) + by_status.get("closed", 0)
+        completion_rate = round((resolved / total * 100), 1) if total > 0 else 0.0
+
+        return {
+            "total_items": total,
+            "by_category": by_category,
+            "by_status": by_status,
+            "completion_rate": completion_rate,
+            "project_count": len(TARGET_PROJECTS),
+        }
+
     def get_project_work_stats(self, db: Session, github_repo: str) -> dict:
         """특정 프로젝트의 Work Items 통계"""
         items = (
@@ -269,8 +299,8 @@ class StatsService:
 
         result = []
         for proj in TARGET_PROJECTS:
-            repo = proj["repo"]
-            items = repo_map.get(repo, [])
+            repo_name = proj.get("repo_name", proj["name"])
+            items = repo_map.get(repo_name, [])
             total = len(items)
 
             by_status = {}
@@ -286,7 +316,8 @@ class StatsService:
 
             result.append({
                 "project_name": proj["name"],
-                "github_repo": repo,
+                "github_repo": proj["repo"],
+                "repo_name": repo_name,
                 "total_items": total,
                 "open_count": open_count,
                 "in_progress_count": in_progress,
