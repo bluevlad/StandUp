@@ -2,31 +2,229 @@
 
 {% block title %}StandUp - Dashboard{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
-{% block page_meta %}업무보고 현황 요약{% endblock %}
+{% block page_meta %}프로젝트 업무현황 종합{% endblock %}
 
 {% block content %}
-<!-- Summary Cards -->
-<div class="summary-grid">
-    <a href="{{ base_path }}/dashboard/work-items" class="summary-card blue">
-        <div class="number">{{ summary.total_items }}</div>
-        <div class="label">전체 업무</div>
-    </a>
-    <a href="{{ base_path }}/dashboard/work-items?status=completed" class="summary-card green">
-        <div class="number">{{ summary.completion_rate }}%</div>
-        <div class="label">완료율</div>
-    </a>
-    <a href="{{ base_path }}/dashboard/work-items?category=in_progress" class="summary-card amber">
-        <div class="number">{{ summary.by_category.get('in_progress', 0) }}</div>
-        <div class="label">진행중</div>
-    </a>
-    <a href="{{ base_path }}/dashboard/work-items?category=required" class="summary-card red">
-        <div class="number">{{ summary.by_category.get('required', 0) }}</div>
-        <div class="label">요구사항</div>
-    </a>
-    <a href="{{ base_path }}/dashboard/work-items?group_by=project" class="summary-card slate">
-        <div class="number">{{ summary.project_count }}</div>
-        <div class="label">프로젝트</div>
-    </a>
+<style>
+    .home-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+    .hm-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .hm-card .val {
+        font-size: 28px;
+        font-weight: bold;
+        line-height: 1;
+    }
+    .hm-card .lbl {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 6px;
+    }
+
+    .proj-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 14px;
+        margin-bottom: 24px;
+    }
+    .proj-card {
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        overflow: hidden;
+        transition: box-shadow 0.15s, transform 0.15s;
+    }
+    .proj-card:hover {
+        box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .proj-card-link {
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .proj-card-head {
+        padding: 14px 18px 10px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+    .proj-card-name {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+    }
+    .proj-card-plan {
+        font-size: 11px;
+        color: #64748b;
+        margin-top: 2px;
+    }
+    .proj-card-body {
+        padding: 12px 18px 14px;
+        flex: 1;
+    }
+
+    .issue-badges {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    .ib {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+    .ib-total { background: #f1f5f9; color: #475569; }
+    .ib-open { background: #fee2e2; color: #991b1b; }
+    .ib-prog { background: #fef3c7; color: #92400e; }
+    .ib-done { background: #dcfce7; color: #166534; }
+
+    .prog-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 5px;
+        font-size: 12px;
+    }
+    .prog-lbl {
+        min-width: 48px;
+        color: #64748b;
+        font-weight: 500;
+    }
+    .prog-bar {
+        flex: 1;
+        height: 7px;
+        background: #f1f5f9;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .prog-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+    .pf-progress { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+    .pf-completion { background: linear-gradient(90deg, #16a34a, #4ade80); }
+    .pf-quality { background: linear-gradient(90deg, #d97706, #fbbf24); }
+    .prog-val {
+        min-width: 38px;
+        text-align: right;
+        font-weight: 600;
+        font-size: 11px;
+    }
+
+    .no-plan-tag {
+        font-size: 11px;
+        color: #94a3b8;
+        padding: 2px 8px;
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+
+    @media (max-width: 768px) {
+        .proj-grid { grid-template-columns: 1fr; }
+    }
+</style>
+
+<!-- Summary Cards (TARGET_PROJECTS 기준) -->
+<div class="home-metrics">
+    <div class="hm-card" style="border-top: 3px solid #2563eb;">
+        <div class="val" style="color:#2563eb;">{{ summary.project_count }}</div>
+        <div class="lbl">관리 프로젝트</div>
+    </div>
+    <div class="hm-card" style="border-top: 3px solid #475569;">
+        <div class="val" style="color:#475569;">{{ summary.total_items }}</div>
+        <div class="lbl">전체 Issues</div>
+    </div>
+    <div class="hm-card" style="border-top: 3px solid #16a34a;">
+        <div class="val" style="color:#16a34a;">{{ summary.completion_rate }}%</div>
+        <div class="lbl">완료율</div>
+    </div>
+    <div class="hm-card" style="border-top: 3px solid #d97706;">
+        <div class="val" style="color:#d97706;">{{ summary.by_status.get('in_progress', 0) }}</div>
+        <div class="lbl">진행중</div>
+    </div>
+    <div class="hm-card" style="border-top: 3px solid #dc2626;">
+        <div class="val" style="color:#dc2626;">{{ summary.by_status.get('open', 0) }}</div>
+        <div class="lbl">Open</div>
+    </div>
+    <div class="hm-card" style="border-top: 3px solid #16a34a;">
+        <div class="val" style="color:#16a34a;">{{ summary.by_status.get('resolved', 0) + summary.by_status.get('closed', 0) }}</div>
+        <div class="lbl">완료</div>
+    </div>
+    <div class="hm-card" style="border-top: 3px solid #3b82f6;">
+        <div class="val" style="color:#3b82f6;">{{ overall.avg_progress }}%</div>
+        <div class="lbl">평균 Plan 진행률</div>
+    </div>
+    <div class="hm-card" style="border-top: 3px solid #d97706;">
+        <div class="val" style="color:#d97706;">{{ overall.avg_quality }}%</div>
+        <div class="lbl">평균 품질</div>
+    </div>
+</div>
+
+<!-- Project Cards -->
+<div class="card" style="padding:16px 20px;">
+    <div class="card-header" style="margin-bottom:12px;">
+        <h2>프로젝트별 현황</h2>
+        <a href="{{ base_path }}/dashboard/projects" style="font-size:12px; color:#2563eb; text-decoration:none;">상세보기 &rarr;</a>
+    </div>
+    <div class="proj-grid">
+    {% for p in projects %}
+        <div class="proj-card">
+            <a href="{{ base_path }}/dashboard/projects/{{ p.project_name }}" class="proj-card-link">
+                <div class="proj-card-head">
+                    <div class="proj-card-name">{{ p.project_name }}</div>
+                    {% if p.active_plan_title %}
+                    <div class="proj-card-plan">{{ p.active_plan_title }}</div>
+                    {% endif %}
+                </div>
+                <div class="proj-card-body">
+                    <div class="issue-badges">
+                        <span class="ib ib-total">Issues {{ p.total_items }}</span>
+                        <span class="ib ib-open">Open {{ p.open_count }}</span>
+                        <span class="ib ib-prog">진행 {{ p.in_progress_count }}</span>
+                        <span class="ib ib-done">완료 {{ p.resolved_count }}</span>
+                    </div>
+                    {% if p.plan_count > 0 %}
+                    <div>
+                        <div class="prog-row">
+                            <span class="prog-lbl">진행률</span>
+                            <div class="prog-bar"><div class="prog-fill pf-progress" style="width:{{ p.progress_pct }}%;"></div></div>
+                            <span class="prog-val" style="color:#3b82f6;">{{ p.progress_pct }}%</span>
+                        </div>
+                        <div class="prog-row">
+                            <span class="prog-lbl">완료율</span>
+                            <div class="prog-bar"><div class="prog-fill pf-completion" style="width:{{ p.completion_pct }}%;"></div></div>
+                            <span class="prog-val" style="color:#16a34a;">{{ p.completion_pct }}%</span>
+                        </div>
+                        <div class="prog-row">
+                            <span class="prog-lbl">품질</span>
+                            <div class="prog-bar"><div class="prog-fill pf-quality" style="width:{{ p.quality_score }}%;"></div></div>
+                            <span class="prog-val" style="color:#d97706;">{{ p.quality_score }}%</span>
+                        </div>
+                    </div>
+                    {% else %}
+                    <span class="no-plan-tag">Plan 미등록</span>
+                    {% endif %}
+                </div>
+            </a>
+        </div>
+    {% endfor %}
+    </div>
 </div>
 
 <!-- Recent Reports -->
@@ -64,52 +262,4 @@
         </table>
     </div>
 </div>
-
-<!-- Project Summary -->
-{% if summary.projects %}
-<div class="card">
-    <div class="card-header">
-        <h2>프로젝트별 업무 현황</h2>
-    </div>
-    <div class="chart-container">
-        <canvas id="projectChart"></canvas>
-    </div>
-</div>
-{% endif %}
-{% endblock %}
-
-{% block scripts %}
-{% if summary.projects %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const projects = {{ summary.projects | tojson }};
-    const labels = Object.keys(projects).map(function(k) {
-        return k.length > 25 ? k.substring(0, 25) + '...' : k;
-    });
-    const data = Object.values(projects);
-
-    new Chart(document.getElementById('projectChart'), {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: '업무 건수',
-                data: data,
-                backgroundColor: '#3b82f6',
-                borderRadius: 4,
-            }]
-        },
-        options: {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { beginAtZero: true, ticks: { stepSize: 1 } }
-            }
-        }
-    });
-});
-</script>
-{% endif %}
 {% endblock %}

@@ -16,15 +16,18 @@ from ..models.dev_plan import (
 logger = logging.getLogger(__name__)
 
 # 대상 프로젝트 목록
+# - name: 프로젝트 표시명 / DevPlan.project_name 매칭키
+# - repo: GitHub full path (owner/repo) - 링크 생성용
+# - repo_name: WorkItem.github_repo 매칭키 (DB 저장 형식)
 TARGET_PROJECTS = [
-    {"name": "hopenvision", "repo": "bluevlad/hopenvision"},
-    {"name": "AllergyInsight", "repo": "bluevlad/AllergyInsight"},
-    {"name": "EduFit", "repo": "bluevlad/EduFit"},
-    {"name": "NewsLetterPlatform", "repo": "bluevlad/NewsLetterPlatform"},
-    {"name": "unmong-main", "repo": "bluevlad/unmong-main"},
-    {"name": "StandUp", "repo": "bluevlad/StandUp"},
-    {"name": "Autonomous-QA-Agent", "repo": "bluevlad/Autonomous-QA-Agent"},
-    {"name": "Auto-Tobe-Agent", "repo": "bluevlad/Auto-Tobe-Agent"},
+    {"name": "hopenvision", "repo": "bluevlad/hopenvision", "repo_name": "hopenvision"},
+    {"name": "AllergyInsight", "repo": "bluevlad/AllergyInsight", "repo_name": "AllergyInsight"},
+    {"name": "EduFit", "repo": "bluevlad/EduFit", "repo_name": "EduFit"},
+    {"name": "NewsLetterPlatform", "repo": "bluevlad/NewsLetterPlatform", "repo_name": "NewsLetterPlatform"},
+    {"name": "unmong-main", "repo": "bluevlad/unmong-main", "repo_name": "unmong-main"},
+    {"name": "StandUp", "repo": "bluevlad/StandUp", "repo_name": "StandUp"},
+    {"name": "Autonomous-QA-Agent", "repo": "bluevlad/Autonomous-QA-Agent", "repo_name": "Autonomous-QA-Agent"},
+    {"name": "Auto-Tobe-Agent", "repo": "bluevlad/Auto-Tobe-Agent", "repo_name": "Auto-Tobe-Agent"},
 ]
 
 
