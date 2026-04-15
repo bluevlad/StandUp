@@ -16,21 +16,23 @@ jobs:
         with:
           ref: prod
 
-      - name: Create .env.production from secrets
+      - name: Create .env.production from secrets and variables
         env:
+          # Secrets — 민감정보 (repo secret 유지)
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
           GH_TOKEN_VAL: ${{ secrets.GH_TOKEN }}
-          GH_ORG_VAL: ${{ secrets.GH_ORG }}
-          DAILY_REPORT_HOUR: ${{ secrets.DAILY_REPORT_HOUR }}
-          DAILY_REPORT_MINUTE: ${{ secrets.DAILY_REPORT_MINUTE }}
-          WEEKLY_REPORT_HOUR: ${{ secrets.WEEKLY_REPORT_HOUR }}
-          WEEKLY_REPORT_MINUTE: ${{ secrets.WEEKLY_REPORT_MINUTE }}
-          MONTHLY_REPORT_HOUR: ${{ secrets.MONTHLY_REPORT_HOUR }}
-          MONTHLY_REPORT_MINUTE: ${{ secrets.MONTHLY_REPORT_MINUTE }}
-          LOG_LEVEL: ${{ secrets.LOG_LEVEL }}
+          # Variables — 비민감 설정값 (repo variables, ENVIRONMENT_STANDARD.md §8.4)
+          GH_ORG_VAL: ${{ vars.GH_ORG }}
+          DAILY_REPORT_HOUR: ${{ vars.DAILY_REPORT_HOUR }}
+          DAILY_REPORT_MINUTE: ${{ vars.DAILY_REPORT_MINUTE }}
+          WEEKLY_REPORT_HOUR: ${{ vars.WEEKLY_REPORT_HOUR }}
+          WEEKLY_REPORT_MINUTE: ${{ vars.WEEKLY_REPORT_MINUTE }}
+          MONTHLY_REPORT_HOUR: ${{ vars.MONTHLY_REPORT_HOUR }}
+          MONTHLY_REPORT_MINUTE: ${{ vars.MONTHLY_REPORT_MINUTE }}
+          LOG_LEVEL: ${{ vars.LOG_LEVEL }}
         run: |
           cat > .env.production << EOF
           DATABASE_URL=${DATABASE_URL}
