@@ -6,7 +6,11 @@ FastAPI 메인 애플리케이션
 import logging
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
@@ -64,6 +68,16 @@ app.include_router(stats.router, prefix="/api/v1")
 app.include_router(dev_plans.router, prefix="/api/v1")
 app.include_router(dashboard.router)
 
+# 서비스 소개 페이지 (intro.html) 정적 자산
+_intro_static = Path(__file__).parent / "static"
+if (_intro_static / "css").is_dir():
+    app.mount("/css", StaticFiles(directory=str(_intro_static / "css")), name="intro-css")
+
+
+@app.get("/intro.html", include_in_schema=False)
+def intro_page():
+    return FileResponse(_intro_static / "intro.html")
+
 
 @app.get("/")
 def root():
@@ -71,4 +85,5 @@ def root():
         "service": "StandUp",
         "version": APP_VERSION,
         "docs": "/docs",
+        "intro": "/intro.html",
     }
