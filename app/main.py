@@ -10,7 +10,6 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from alembic.config import Config as AlembicConfig
 from alembic import command as alembic_command
@@ -68,10 +67,10 @@ app.include_router(stats.router, prefix="/api/v1")
 app.include_router(dev_plans.router, prefix="/api/v1")
 app.include_router(dashboard.router)
 
-# 서비스 소개 페이지 (intro.html) 정적 자산
+# 서비스 소개 페이지 (intro.html) 라우트
+# StaticFiles mount 대신 직접 라우트로 노출 — ROOT_PATH 환경에서 mount는
+# root_path가 prepend된 경로만 매칭하지만 라우트는 양쪽 모두 매칭한다.
 _intro_static = Path(__file__).parent / "static"
-if (_intro_static / "css").is_dir():
-    app.mount("/css", StaticFiles(directory=str(_intro_static / "css")), name="intro-css")
 
 
 @app.get("/", include_in_schema=False)
@@ -82,6 +81,14 @@ def root():
 @app.get("/intro.html", include_in_schema=False)
 def intro_page():
     return FileResponse(_intro_static / "intro.html")
+
+
+@app.get("/css/service-landing.css", include_in_schema=False)
+def landing_css():
+    return FileResponse(
+        _intro_static / "css" / "service-landing.css",
+        media_type="text/css",
+    )
 
 
 @app.get("/api/info", include_in_schema=False)
