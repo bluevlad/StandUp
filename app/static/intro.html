@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StandUp - Autonomous Dev & Ops</title>
-    <meta name="description" content="StandUp - 업무 추적부터 통계까지, 자동화 에이전트">
+    <title>StandUp - Work Management Agent</title>
+    <meta name="description" content="StandUp - GitHub 이벤트 자동 수집 기반 업무 추적·통계·리포트 자동화 에이전트">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/service-landing.css">
@@ -18,138 +18,155 @@
 <body>
     <div class="sl-container">
 
-        <nav class="sl-topnav">
-            <div class="sl-nav-links">
-                <a href="https://www.unmong.com/index.html" class="sl-nav-link"><span class="sl-nav-arrow">&#8593;</span> Portal</a>
-                <a href="https://www.unmong.com/architecture.html" class="sl-nav-link"><span class="sl-nav-arrow">&#8594;</span> Architecture</a>
-            </div>
-        </nav>
-
+        <!-- Hero -->
         <section class="sl-hero">
-            <div class="sl-hero-status"><span class="dot"></span> Active</div>
             <h1>StandUp</h1>
-            <p class="tagline">Work Management Automation Agent</p>
-            <p class="desc">GitHub 이벤트를 자동 수집하여 작업 이력을 정리하고, 팀 생산성 통계와 자동화 리포트를 제공하는 업무 관리 에이전트</p>
-            <div class="sl-hero-actions">
-                <a href="https://standup.unmong.com/dashboard" target="_blank" rel="noopener" class="sl-btn sl-btn-primary">대시보드</a>
-                <a href="https://standup.unmong.com/dashboard/stats" target="_blank" rel="noopener" class="sl-btn sl-btn-outline">통계</a>
-                <a href="https://standup.unmong.com/docs" target="_blank" rel="noopener" class="sl-btn sl-btn-outline">API Docs</a>
-            </div>
+            <p class="tagline">Work Management Agent · GitHub Activity Tracker</p>
+            <p class="desc">GitHub 커밋·PR·이슈 이벤트를 자동 수집하여 작업 이력을 분류·태깅하고, 팀 생산성 통계와 일/주/월 단위 리포트를 자동 생성·발송하는 업무관리 에이전트</p>
         </section>
 
+        <!-- Features -->
         <section class="sl-section">
             <div class="sl-section-title">Features</div>
             <div class="sl-features">
-                <a class="sl-feature" href="https://standup.unmong.com/dashboard" target="_blank" rel="noopener">
+                <a class="sl-feature" href="/dashboard">
                     <span class="sl-feature-icon">&#128203;</span>
                     <div class="sl-feature-name">대시보드</div>
-                    <div class="sl-feature-desc">일일 작업 현황 및 진행 상태 실시간 확인</div>
-                    <span class="sl-feature-tag">Dashboard</span>
+                    <div class="sl-feature-desc">일/주/월 단위 작업 현황과 진행 상태를 실시간으로 확인</div>
+                    <span class="sl-feature-tag">Public · Dashboard</span>
                 </a>
-                <a class="sl-feature" href="https://standup.unmong.com/dashboard/stats" target="_blank" rel="noopener">
+                <a class="sl-feature" href="/dashboard/stats">
                     <span class="sl-feature-icon">&#128200;</span>
                     <div class="sl-feature-name">통계</div>
-                    <div class="sl-feature-desc">커밋/PR/이슈 기반 생산성 통계 분석</div>
-                    <span class="sl-feature-tag">Statistics</span>
+                    <div class="sl-feature-desc">커밋·PR·이슈 기반 개인/팀 생산성 지표와 추세 분석</div>
+                    <span class="sl-feature-tag">Public · Statistics</span>
                 </a>
-                <a class="sl-feature" href="https://standup.unmong.com/docs" target="_blank" rel="noopener">
+                <a class="sl-feature" href="/dashboard/reports">
+                    <span class="sl-feature-icon">&#128196;</span>
+                    <div class="sl-feature-name">리포트</div>
+                    <div class="sl-feature-desc">자동 생성된 일/주/월 업무 리포트 조회 및 이메일 재발송</div>
+                    <span class="sl-feature-tag">Public · Report</span>
+                </a>
+                <a class="sl-feature" href="/dashboard/dev-plans">
+                    <span class="sl-feature-icon">&#127919;</span>
+                    <div class="sl-feature-name">개발 계획</div>
+                    <div class="sl-feature-desc">서비스별 To-Be 개발 계획 관리 및 진행률 추적</div>
+                    <span class="sl-feature-tag">Public · Planning</span>
+                </a>
+                <a class="sl-feature" href="/dashboard/work-items">
+                    <span class="sl-feature-icon">&#128193;</span>
+                    <div class="sl-feature-name">업무 항목</div>
+                    <div class="sl-feature-desc">수집된 커밋·PR·이슈 단위 업무 항목 검색·필터·태그 조회</div>
+                    <span class="sl-feature-tag">Public · Items</span>
+                </a>
+                <a class="sl-feature" href="/docs">
                     <span class="sl-feature-icon">&#128268;</span>
-                    <div class="sl-feature-name">API</div>
-                    <div class="sl-feature-desc">업무 데이터 조회/관리 RESTful API</div>
-                    <span class="sl-feature-tag">Backend API</span>
+                    <div class="sl-feature-name">API Docs</div>
+                    <div class="sl-feature-desc">Work Items·Reports·Stats·Config RESTful API 명세 (Swagger UI)</div>
+                    <span class="sl-feature-tag">Public · API</span>
                 </a>
             </div>
         </section>
 
+        <!-- Architecture -->
         <section class="sl-section sl-arch">
             <div class="sl-section-title">Architecture</div>
             <div class="sl-arch-diagram">
                 <div class="sl-arch-node">
                     <div class="sl-arch-node-label">GitHub</div>
-                    <div class="sl-arch-node-tech">Events API</div>
+                    <div class="sl-arch-node-tech">Events API<br><span style="opacity:.7;font-size:.85em;">Commits · PR · Issues</span></div>
                 </div>
                 <div class="sl-arch-arrow">&#8594;</div>
                 <div class="sl-arch-node highlight">
                     <div class="sl-arch-node-label">Backend</div>
-                    <div class="sl-arch-node-tech">FastAPI</div>
+                    <div class="sl-arch-node-tech">FastAPI<br><span style="opacity:.7;font-size:.85em;">+ APScheduler</span></div>
                 </div>
                 <div class="sl-arch-arrow">&#8594;</div>
                 <div class="sl-arch-node">
-                    <div class="sl-arch-node-label">Database</div>
-                    <div class="sl-arch-node-tech">PostgreSQL</div>
+                    <div class="sl-arch-node-label">Data Layer</div>
+                    <div class="sl-arch-node-tech">PostgreSQL 15<br><span style="opacity:.7;font-size:.85em;">SQLAlchemy 2.0</span></div>
                 </div>
                 <div class="sl-arch-arrow">&#8592;</div>
                 <div class="sl-arch-node">
                     <div class="sl-arch-node-label">Frontend</div>
-                    <div class="sl-arch-node-tech">React</div>
+                    <div class="sl-arch-node-tech">Dashboard<br><span style="opacity:.7;font-size:.85em;">Jinja2 + Static</span></div>
                 </div>
             </div>
         </section>
 
+        <!-- Flow -->
         <section class="sl-section sl-flow">
             <div class="sl-section-title">Service Flow</div>
             <div class="sl-flow-steps">
                 <div class="sl-flow-step">
                     <div class="sl-flow-step-num">1</div>
                     <div class="sl-flow-step-label">이벤트 수집</div>
-                    <div class="sl-flow-step-desc">GitHub Commits/PR</div>
+                    <div class="sl-flow-step-desc">GitHub Commits · PR · Issues</div>
                 </div>
                 <div class="sl-flow-arrow">&#8594;</div>
                 <div class="sl-flow-step">
                     <div class="sl-flow-step-num">2</div>
-                    <div class="sl-flow-step-label">이력 정리</div>
-                    <div class="sl-flow-step-desc">작업 분류/태깅</div>
+                    <div class="sl-flow-step-label">분류·태깅</div>
+                    <div class="sl-flow-step-desc">QA-Agent · Tobe-Agent</div>
                 </div>
                 <div class="sl-flow-arrow">&#8594;</div>
                 <div class="sl-flow-step">
                     <div class="sl-flow-step-num">3</div>
                     <div class="sl-flow-step-label">통계 분석</div>
-                    <div class="sl-flow-step-desc">생산성 지표</div>
+                    <div class="sl-flow-step-desc">생산성 지표 · 추세 계산</div>
                 </div>
                 <div class="sl-flow-arrow">&#8594;</div>
                 <div class="sl-flow-step">
                     <div class="sl-flow-step-num">4</div>
-                    <div class="sl-flow-step-label">대시보드</div>
-                    <div class="sl-flow-step-desc">시각화 리포트</div>
+                    <div class="sl-flow-step-label">리포트 발송</div>
+                    <div class="sl-flow-step-desc">Report-Agent · Gmail SMTP</div>
                 </div>
             </div>
         </section>
 
+        <!-- Tech Stack -->
         <section class="sl-section sl-tech">
             <div class="sl-section-title">Tech Stack</div>
             <div class="sl-tech-list">
-                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#61dafb;"></span> React</span>
                 <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#009688;"></span> FastAPI</span>
-                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#336791;"></span> PostgreSQL</span>
-                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#333;"></span> GitHub API</span>
-                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#2496ed;"></span> Docker</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#3776ab;"></span> Python 3.11+</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#d71f00;"></span> SQLAlchemy 2.0</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#336791;"></span> PostgreSQL 15</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#10b981;"></span> APScheduler</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#181717;"></span> PyGithub</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#ea4335;"></span> Gmail SMTP</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#b41717;"></span> Jinja2</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#2496ed;"></span> Docker Compose</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#f97316;"></span> Nginx</span>
+                <span class="sl-tech-badge"><span class="sl-tech-dot" style="background:#6c2eb9;"></span> Alembic</span>
             </div>
         </section>
 
+        <!-- Connected Services -->
         <section class="sl-section sl-connected">
             <div class="sl-section-title">Connected Services</div>
             <div class="sl-connected-grid">
-                <a href="https://allergy.unmong.com/intro.html" class="sl-connected-card">
+                <a href="https://allergy.unmong.com/" class="sl-connected-card" target="_blank" rel="noopener noreferrer">
                     <span class="sl-connected-dot" style="background:#f43f5e;"></span>
                     <div class="sl-connected-info">
                         <div class="sl-connected-name">AllergyInsight</div>
-                        <div class="sl-connected-role">변경 추적 대상</div>
+                        <div class="sl-connected-role">변경 추적 대상 저장소</div>
                     </div>
                     <span class="sl-connected-arrow">&#8594;</span>
                 </a>
-                <a href="https://edufit.unmong.com/intro.html" class="sl-connected-card">
-                    <span class="sl-connected-dot" style="background:#10b981;"></span>
+                <a href="https://edufit.unmong.com/" class="sl-connected-card" target="_blank" rel="noopener noreferrer">
+                    <span class="sl-connected-dot" style="background:#22c55e;"></span>
                     <div class="sl-connected-info">
                         <div class="sl-connected-name">EduFit</div>
-                        <div class="sl-connected-role">변경 추적 대상</div>
+                        <div class="sl-connected-role">변경 추적 대상 저장소</div>
                     </div>
                     <span class="sl-connected-arrow">&#8594;</span>
                 </a>
-                <a href="https://infrawatcher.unmong.com/intro.html" class="sl-connected-card">
+                <a href="https://infrawatcher.unmong.com/" class="sl-connected-card" target="_blank" rel="noopener noreferrer">
                     <span class="sl-connected-dot" style="background:#06b6d4;"></span>
                     <div class="sl-connected-info">
                         <div class="sl-connected-name">InfraWatcher</div>
-                        <div class="sl-connected-role">컨테이너 모니터링</div>
+                        <div class="sl-connected-role">컨테이너 모니터링 연동</div>
                     </div>
                     <span class="sl-connected-arrow">&#8594;</span>
                 </a>

@@ -74,16 +74,21 @@ if (_intro_static / "css").is_dir():
     app.mount("/css", StaticFiles(directory=str(_intro_static / "css")), name="intro-css")
 
 
+@app.get("/", include_in_schema=False)
+def root():
+    return FileResponse(_intro_static / "intro.html")
+
+
 @app.get("/intro.html", include_in_schema=False)
 def intro_page():
     return FileResponse(_intro_static / "intro.html")
 
 
-@app.get("/")
-def root():
+@app.get("/api/info", include_in_schema=False)
+def api_info():
     return {
         "service": "StandUp",
         "version": APP_VERSION,
         "docs": "/docs",
-        "intro": "/intro.html",
+        "intro": "/",
     }
