@@ -34,3 +34,6 @@ PyGithub>=2.1.1
 
 # Utilities
 python-dateutil>=2.8.2
+
+# Insight Newsletter (v2) — pgvector RAG (Ollama 는 host 호출이라 SDK 불필요)
+pgvector>=0.3.6
