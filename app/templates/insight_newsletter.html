@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>{{ subject }}</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+         color: #1f2328; line-height: 1.7; max-width: 720px; margin: 0 auto; padding: 24px;
+         background: #fafbfc; }
+  .card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px;
+          padding: 28px 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  h1 { font-size: 22px; margin: 0 0 4px; color: #ef4444; border-bottom: 2px solid #ef4444;
+       padding-bottom: 8px; }
+  h2 { font-size: 16px; margin-top: 24px; margin-bottom: 8px; color: #24292f; }
+  h3 { font-size: 14px; margin-top: 14px; margin-bottom: 4px; color: #57606a; }
+  ul, ol { margin: 4px 0 8px; padding-left: 20px; }
+  li { margin: 2px 0; }
+  a { color: #0969da; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: #f6f8fa; padding: 1px 4px; border-radius: 3px; font-size: 13px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto;
+        font-size: 12px; }
+  .meta { color: #6e7781; font-size: 12px; margin-top: 4px; }
+  .kpi-bar { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0;
+             padding: 10px 14px; background: #f6f8fa; border-radius: 6px; }
+  .kpi { font-size: 12px; color: #57606a; }
+  .kpi b { color: #1f2328; font-size: 14px; display: block; }
+  .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e1e4e8;
+            font-size: 12px; color: #6e7781; text-align: center; }
+  .footer a { margin: 0 8px; }
+  .badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 11px;
+           margin-left: 4px; }
+  .badge-critical { background: #ffebe9; color: #cf222e; }
+  .badge-high     { background: #fff8c5; color: #9a6700; }
+  .badge-medium   { background: #ddf4ff; color: #0969da; }
+  .badge-low      { background: #dafbe1; color: #1a7f37; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>{{ headline }}</h1>
+  <div class="meta">{{ period_start }} ~ {{ period_end }} · {{ generated_at }}</div>
+
+  {% if kpi_items %}
+  <div class="kpi-bar">
+    {% for kpi in kpi_items %}
+    <div class="kpi">{{ kpi.label }}<b>{{ kpi.value }}</b></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {{ body_html | safe }}
+
+  <div class="footer">
+    StandUp Insight · 주간 자동 발송 ·
+    <a href="{{ feedback_up }}">👍 유익함</a>
+    <a href="{{ feedback_down }}">👎 개선 필요</a>
+  </div>
+</div>
+</body>
+</html>
