@@ -9,7 +9,12 @@
 - compose 파일 선택: Darwin → `docker-compose.yml` / Windows → `docker-compose.local.yml`
 
 ## Project Overview
-Git Issues 기반 업무 수집, 분류, 보고서 자동 생성/발송 시스템
+**Insight Newsletter (v2)** — LogAnalyzer / GitHub QA Issues / Auto-Tobe (journal+commit)
+세 소스를 풀 방식으로 수집해 exaone3.5 cascade + pgvector RAG 로 합성한 주간 뉴스레터를 발송.
+기존 일/주/월 보고 (legacy) 도 `STANDUP_MODE` 로 병행 운영 가능.
+
+상세: [docs/INSIGHT_NEWSLETTER.md](docs/INSIGHT_NEWSLETTER.md) ·
+[docs/AGENT_DATA_CONTRACT.md](docs/AGENT_DATA_CONTRACT.md)
 
 ## Environment
 - DB: PostgreSQL 15 (별도 서버, .env로 관리)
@@ -22,12 +27,13 @@ Git Issues 기반 업무 수집, 분류, 보고서 자동 생성/발송 시스�
 - Language: Python 3.11+
 - Framework: FastAPI
 - ORM: SQLAlchemy 2.0 + Alembic
-- Database: PostgreSQL 15 (psycopg2-binary)
+- Database: PostgreSQL 15 + **pgvector** (768-dim, nomic-embed-text)
 - Scheduler: APScheduler
 - Email: smtplib + aiosmtplib (Gmail SMTP)
 - Template: Jinja2
 - GitHub API: PyGithub
 - Config: pydantic-settings + python-dotenv
+- LLM: **Ollama (host)** — `exaone3.5:7.8b` / `qwen2.5-coder:14b` / `llama3.2:3b` / `nomic-embed-text`
 
 ## Build and Run
 ```bash
@@ -49,13 +55,19 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 9060 --reload
 ## Project Structure
 ```
 app/
-├── agents/           # QA-Agent, Tobe-Agent, Report-Agent
-├── core/             # config, database, scheduler
-├── models/           # SQLAlchemy ORM 모델
-├── schemas/          # Pydantic 스키마
-├── services/         # GitHub, Email, Report 서비스
-├── templates/        # Jinja2 이메일 템플릿
-└── api/v1/endpoints/ # FastAPI 라우터
+├── agents/             # (legacy) QA-Agent, Tobe-Agent, Report-Agent
+├── agents_v2/          # (v2) Insight-Newsletter Agent (주간 orchestrator)
+├── ingestion/          # Connector 기반 수집 hub + 정규화
+│   └── connectors/     # loganalyzer / github_qa / auto_tobe
+├── rag/                # nomic-embed-text 임베딩 + pgvector store/retriever
+├── synthesis/          # 3-stage cascade (summarize/analyze/compose)
+├── newsletter/         # builder (markdown→HTML) + sender (Gmail)
+├── core/               # config, database, scheduler
+├── models/             # SQLAlchemy (insight.py 추가)
+├── schemas/
+├── services/           # GitHub, Email, Report 서비스
+├── templates/          # Jinja2 (insight_newsletter.html 추가)
+└── api/v1/endpoints/   # FastAPI (insight.py 추가)
 ```
 
 ## Help Page 관리

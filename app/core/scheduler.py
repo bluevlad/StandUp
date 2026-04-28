@@ -36,16 +36,27 @@ def _job_listener(event):
 
 def run_initial_scan():
     """앱 시작 시 초기 스캔 (별도 스레드)"""
-    from ..agents.qa_agent import get_qa_agent
-    from ..agents.tobe_agent import get_tobe_agent
-
     logger.info("=== 초기 Agent 스캔 시작 ===")
     try:
-        qa_agent = get_qa_agent()
-        qa_agent.run()
+        if settings.is_legacy_mode:
+            from ..agents.qa_agent import get_qa_agent
+            from ..agents.tobe_agent import get_tobe_agent
 
-        tobe_agent = get_tobe_agent()
-        tobe_agent.run()
+            qa_agent = get_qa_agent()
+            qa_agent.run()
+
+            tobe_agent = get_tobe_agent()
+            tobe_agent.run()
+
+        if settings.is_insight_mode:
+            # 초기 ingestion 만 실행 — 합성/발송은 스케줄에 맡김
+            from ..ingestion.hub import IngestionHub
+            try:
+                result = IngestionHub(embed_chunks=True).run()
+                logger.info("초기 ingestion: new_events=%d new_chunks=%d",
+                            result.new_events, result.new_chunks)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("초기 ingestion 실패 (스케줄 동작은 무관): %s", e)
 
         logger.info("=== 초기 Agent 스캔 완료 ===")
     except Exception as e:
@@ -78,76 +89,99 @@ def _safe_add_job(func, trigger, job_id, job_name):
 
 
 def setup_scheduler():
-    """스케줄러 초기화 및 작업 등록"""
-    from ..agents.qa_agent import get_qa_agent
-    from ..agents.tobe_agent import get_tobe_agent
-    from ..agents.report_agent import get_report_agent
+    """스케줄러 초기화 및 작업 등록.
 
-    qa_agent = get_qa_agent()
-    tobe_agent = get_tobe_agent()
-    report_agent = get_report_agent()
-
+    STANDUP_MODE:
+    - legacy : 기존 일/주/월 보고 (qa/tobe/report agent)
+    - insight: 신규 주간 인사이트 뉴스레터 (cascade + RAG)
+    - both   : 둘 다 실행 (전환기 병행 운영)
+    """
     # 이벤트 리스너 등록
     scheduler.add_listener(_job_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR)
 
     # 스케줄러 timezone (CronTrigger에 명시적 전달 필수 - 컨테이너 UTC 대응)
     tz = "Asia/Seoul"
 
-    # QA-Agent: 매 2시간 실행 (업무시간 내)
-    _safe_add_job(
-        qa_agent.run,
-        CronTrigger(hour="8-18/2", minute=0, day_of_week="mon-fri", timezone=tz),
-        "qa_agent_scan", "QA-Agent Issues 스캔",
-    )
+    logger.info("스케줄러 모드: %s", settings.standup_mode)
 
-    # Tobe-Agent: 매 1시간 실행 (업무시간 내)
-    _safe_add_job(
-        tobe_agent.run,
-        CronTrigger(hour="8-18", minute=30, day_of_week="mon-fri", timezone=tz),
-        "tobe_agent_track", "Tobe-Agent 진행사항 추적",
-    )
+    if settings.is_legacy_mode:
+        from ..agents.qa_agent import get_qa_agent
+        from ..agents.tobe_agent import get_tobe_agent
+        from ..agents.report_agent import get_report_agent
 
-    # 일일보고: 월~금
-    _safe_add_job(
-        report_agent.send_daily_report,
-        CronTrigger(
-            hour=settings.daily_report_hour,
-            minute=settings.daily_report_minute,
-            day_of_week="mon-fri",
-            timezone=tz,
-        ),
-        "daily_report", "일일업무보고 발송",
-    )
+        qa_agent = get_qa_agent()
+        tobe_agent = get_tobe_agent()
+        report_agent = get_report_agent()
 
-    # 주간보고: 금요일
-    _safe_add_job(
-        report_agent.send_weekly_report,
-        CronTrigger(
-            hour=settings.weekly_report_hour,
-            minute=settings.weekly_report_minute,
-            day_of_week="fri",
-            timezone=tz,
-        ),
-        "weekly_report", "주간업무보고 발송",
-    )
+        # QA-Agent: 매 2시간 실행 (업무시간 내)
+        _safe_add_job(
+            qa_agent.run,
+            CronTrigger(hour="8-18/2", minute=0, day_of_week="mon-fri", timezone=tz),
+            "qa_agent_scan", "QA-Agent Issues 스캔",
+        )
 
-    # 월간보고: 마지막주 금요일 (매주 금요일 실행 + 마지막 주 검증)
-    def _monthly_report_if_last_friday():
-        if _is_last_friday_of_month():
-            report_agent.send_monthly_report()
-        else:
-            logger.debug("월간보고 스킵: 마지막 주 금요일이 아닙니다.")
+        # Tobe-Agent: 매 1시간 실행 (업무시간 내)
+        _safe_add_job(
+            tobe_agent.run,
+            CronTrigger(hour="8-18", minute=30, day_of_week="mon-fri", timezone=tz),
+            "tobe_agent_track", "Tobe-Agent 진행사항 추적",
+        )
 
-    _safe_add_job(
-        _monthly_report_if_last_friday,
-        CronTrigger(
-            hour=settings.monthly_report_hour,
-            minute=settings.monthly_report_minute,
-            day_of_week="fri",
-            timezone=tz,
-        ),
-        "monthly_report", "월간업무보고 발송",
-    )
+        # 일일보고: 월~금
+        _safe_add_job(
+            report_agent.send_daily_report,
+            CronTrigger(
+                hour=settings.daily_report_hour,
+                minute=settings.daily_report_minute,
+                day_of_week="mon-fri",
+                timezone=tz,
+            ),
+            "daily_report", "일일업무보고 발송",
+        )
+
+        # 주간보고: 금요일
+        _safe_add_job(
+            report_agent.send_weekly_report,
+            CronTrigger(
+                hour=settings.weekly_report_hour,
+                minute=settings.weekly_report_minute,
+                day_of_week="fri",
+                timezone=tz,
+            ),
+            "weekly_report", "주간업무보고 발송",
+        )
+
+        # 월간보고: 마지막주 금요일 (매주 금요일 실행 + 마지막 주 검증)
+        def _monthly_report_if_last_friday():
+            if _is_last_friday_of_month():
+                report_agent.send_monthly_report()
+            else:
+                logger.debug("월간보고 스킵: 마지막 주 금요일이 아닙니다.")
+
+        _safe_add_job(
+            _monthly_report_if_last_friday,
+            CronTrigger(
+                hour=settings.monthly_report_hour,
+                minute=settings.monthly_report_minute,
+                day_of_week="fri",
+                timezone=tz,
+            ),
+            "monthly_report", "월간업무보고 발송",
+        )
+
+    if settings.is_insight_mode:
+        from ..agents_v2.insight_newsletter import run_weekly_job
+
+        _safe_add_job(
+            run_weekly_job,
+            CronTrigger(
+                day_of_week=settings.insight_weekly_dow,
+                hour=settings.insight_weekly_hour,
+                minute=settings.insight_weekly_minute,
+                timezone=tz,
+            ),
+            "insight_weekly", "Insight 주간 뉴스레터 발송 (exaone3.5 cascade)",
+        )
 
     scheduler.start()
     logger.info("스케줄러 시작 완료")

@@ -59,12 +59,70 @@ class Settings(BaseSettings):
     max_projects_per_category: int = Field(default=5, env="MAX_PROJECTS_PER_CATEGORY")
     max_items_per_project: int = Field(default=3, env="MAX_ITEMS_PER_PROJECT")
 
+    # ──────────────────────────────────────────────────────────────────────
+    # Insight Newsletter (v2) — exaone3.5 cascade
+    # ──────────────────────────────────────────────────────────────────────
+    # 모드: legacy (기존 일/주/월) | insight (신규 주간 뉴스레터) | both (병행)
+    standup_mode: str = Field(default="both", env="STANDUP_MODE")
+
+    # Ollama (host에 설치된 모델 호출 — Docker 컨테이너에서 host.docker.internal 사용)
+    ollama_base_url: str = Field(default="http://host.docker.internal:11434", env="OLLAMA_BASE_URL")
+    ollama_model_summarize: str = Field(default="llama3.2:3b", env="OLLAMA_MODEL_SUMMARIZE")
+    ollama_model_analyze: str = Field(default="qwen2.5-coder:14b", env="OLLAMA_MODEL_ANALYZE")
+    ollama_model_compose: str = Field(default="exaone3.5:7.8b", env="OLLAMA_MODEL_COMPOSE")
+    ollama_model_embed: str = Field(default="nomic-embed-text", env="OLLAMA_MODEL_EMBED")
+    ollama_embed_dim: int = Field(default=768, env="OLLAMA_EMBED_DIM")
+    ollama_timeout_sec: int = Field(default=600, env="OLLAMA_TIMEOUT_SEC")
+
+    # Insight 스케줄 (월요일 09:00)
+    insight_weekly_dow: str = Field(default="mon", env="INSIGHT_WEEKLY_DOW")
+    insight_weekly_hour: int = Field(default=9, env="INSIGHT_WEEKLY_HOUR")
+    insight_weekly_minute: int = Field(default=0, env="INSIGHT_WEEKLY_MINUTE")
+
+    # Ingestion 소스
+    loganalyzer_base_url: str = Field(default="http://host.docker.internal:9092", env="LOGANALYZER_BASE_URL")
+    loganalyzer_enabled: bool = Field(default=True, env="LOGANALYZER_ENABLED")
+    # 콤마 구분 — 합성·집계에서 제외할 service_group (대소문자 무관 매칭)
+    loganalyzer_exclude_services: str = Field(
+        default="InfraWatcher", env="LOGANALYZER_EXCLUDE_SERVICES",
+    )
+    github_qa_enabled: bool = Field(default=False, env="GITHUB_QA_ENABLED")
+    github_qa_repos: str = Field(default="", env="GITHUB_QA_REPOS")  # "owner/repo,owner/repo"
+    github_qa_label: str = Field(default="qa-agent", env="GITHUB_QA_LABEL")
+    auto_tobe_enabled: bool = Field(default=False, env="AUTO_TOBE_ENABLED")
+    auto_tobe_journal_glob: str = Field(default="", env="AUTO_TOBE_JOURNAL_GLOB")  # 예: /work/*/AUTO_TOBE_*.md
+    auto_tobe_git_repos: str = Field(default="", env="AUTO_TOBE_GIT_REPOS")  # ":" 구분 로컬 경로
+
+    # 합성 윈도우
+    insight_window_days: int = Field(default=7, env="INSIGHT_WINDOW_DAYS")
+    insight_subject_prefix: str = Field(default="[StandUp Insight]", env="INSIGHT_SUBJECT_PREFIX")
+
     # 로깅
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
 
     # API
     api_port: int = Field(default=9060, env="API_PORT")
     root_path: str = Field(default="", env="ROOT_PATH")
+
+    @property
+    def loganalyzer_excluded_services(self) -> set[str]:
+        return {s.strip().lower() for s in self.loganalyzer_exclude_services.split(",") if s.strip()}
+
+    @property
+    def github_qa_repo_list(self) -> list[str]:
+        return [r.strip() for r in self.github_qa_repos.split(",") if r.strip()]
+
+    @property
+    def auto_tobe_git_repo_list(self) -> list[str]:
+        return [r.strip() for r in self.auto_tobe_git_repos.split(":") if r.strip()]
+
+    @property
+    def is_insight_mode(self) -> bool:
+        return self.standup_mode in ("insight", "both")
+
+    @property
+    def is_legacy_mode(self) -> bool:
+        return self.standup_mode in ("legacy", "both")
 
     @property
     def recipient_list(self) -> list[str]:
