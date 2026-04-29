@@ -98,7 +98,8 @@ jobs:
 
           while IFS= read -r commit; do
             [ -z "$commit" ] && continue
-            if ! git cherry-pick -x "$commit"; then
+            # --empty=drop: 동일 내용이지만 base tree 차이로 patch-id 가 다른 commit 도 안전 처리
+            if ! git cherry-pick -x --empty=drop "$commit"; then
               echo "::warning::cherry-pick failed for $commit — falling back to PR"
               git cherry-pick --abort || true
               echo "fallback=true" >> "$GITHUB_OUTPUT"
