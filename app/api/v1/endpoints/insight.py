@@ -8,6 +8,7 @@ from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -134,9 +135,8 @@ def list_newsletters(limit: int = Query(20, ge=1, le=100),
     ]
 
 
-@router.get("/newsletters/{newsletter_id}/preview", response_class=None)
+@router.get("/newsletters/{newsletter_id}/preview", response_class=HTMLResponse)
 def preview_newsletter(newsletter_id: str, db: Session = Depends(get_db)):
-    from fastapi.responses import HTMLResponse
     nl = db.get(Newsletter, newsletter_id)
     if nl is None:
         raise HTTPException(404, "newsletter not found")
