@@ -271,15 +271,18 @@ def stats_page(
 @router.get("/dev-plans", response_class=HTMLResponse)
 def dev_plans_page(db: Session = Depends(get_db)):
     """개발 플랜 현황 페이지"""
+    from ....services.hopenvision_proposal_service import get_ai_generated_plan_ids
+
     service = get_dev_plan_service()
     overall = service.get_overall_metrics(db)
     projects = service.get_project_summary(db)
 
-    # 프로젝트별 플랜 목록 (상세 링크용)
-    from sqlalchemy.orm import joinedload
+    # 프로젝트별 플랜 목록 (상세 링크용) — AI 제안 DRAFT 도 노출
     all_plans = (
         db.query(DevPlan)
-        .filter(DevPlan.status.in_([PlanStatus.ACTIVE, PlanStatus.COMPLETED]))
+        .filter(DevPlan.status.in_(
+            [PlanStatus.DRAFT, PlanStatus.ACTIVE, PlanStatus.COMPLETED]
+        ))
         .order_by(DevPlan.project_name, DevPlan.updated_at.desc())
         .all()
     )
@@ -287,11 +290,14 @@ def dev_plans_page(db: Session = Depends(get_db)):
     for plan in all_plans:
         plans_by_project.setdefault(plan.project_name, []).append(plan)
 
+    ai_generated_plan_ids = get_ai_generated_plan_ids(db)
+
     return _render(
         "dev_plans.html",
         overall=overall,
         projects=projects,
         plans_by_project=plans_by_project,
+        ai_generated_plan_ids=ai_generated_plan_ids,
         active_page="dev_plans",
     )
 
@@ -511,3 +517,46 @@ def insights_topic_related(cluster_key: str, db: Session = Depends(get_db)):
     from ....services.topic_cluster_service import get_related_newsletters
     related = get_related_newsletters(db, cluster_key, top_k=3)
     return _render("partials/topic_related.html", related=related)
+
+
+@router.post("/insights/topics/{cluster_key}/hopenvision/generate",
+             response_class=HTMLResponse)
+def insights_hopenvision_generate(
+    cluster_key: str,
+    force: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """HTMX: 토픽 클러스터 → HopenVision 적용 LLM 제안 생성/조회."""
+    from ....services.hopenvision_proposal_service import generate_proposal
+    try:
+        result = generate_proposal(db, cluster_key, force=force)
+    except ValueError as e:
+        return _render("partials/hopenvision_proposal.html",
+                       error=str(e), proposal=None)
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception("hopenvision generate 실패")
+        return _render("partials/hopenvision_proposal.html",
+                       error=f"제안 생성 중 오류: {e}", proposal=None)
+    return _render("partials/hopenvision_proposal.html",
+                   proposal=result, error=None)
+
+
+@router.post("/insights/proposals/{proposal_id}/accept",
+             response_class=HTMLResponse)
+def insights_hopenvision_accept(proposal_id: str, db: Session = Depends(get_db)):
+    """HTMX: 제안 수락 → DevPlan 자동 초안 생성."""
+    from ....services.hopenvision_proposal_service import accept_as_dev_plan
+    try:
+        plan = accept_as_dev_plan(db, proposal_id)
+    except ValueError as e:
+        html = f'<div style="color:#cf222e; font-size:12px;">{e}</div>'
+        return HTMLResponse(content=html, status_code=400)
+    href = f"{settings.root_path}/dashboard/dev-plans/{plan.id}"
+    html = (
+        f'<div style="color:#16a34a; font-size:12px; padding:8px 0;">'
+        f'✓ DevPlan 초안 생성됨 — '
+        f'<a href="{href}" style="color:#2563eb; text-decoration:underline;">'
+        f'#{plan.id} {plan.title}</a></div>'
+    )
+    return HTMLResponse(content=html)
