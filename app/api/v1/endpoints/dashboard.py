@@ -446,10 +446,12 @@ def project_detail(
 def insights_page(
     severity: str = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
+    cluster_days: int = Query(default=30, ge=7, le=120),
     db: Session = Depends(get_db),
 ):
-    """Insight 뉴스레터 타임라인 (PR1: 섹션 ① 주차별 Tech Digest)"""
+    """Insight 통합 페이지 — ① Tech Digest + ② 토픽 클러스터 + (③ PR3 placeholder)"""
     from sqlalchemy import select
+    from ....services.topic_cluster_service import get_topic_clusters
 
     nl_q = select(Newsletter).order_by(Newsletter.created_at.desc()).limit(limit)
     newsletters = db.scalars(nl_q).all()
@@ -482,13 +484,30 @@ def insights_page(
             "sev_counts": sev_counts,
         })
 
-    # severity 필터 적용 (해당 severity 가 1건 이상인 카드만)
     if severity in ("critical", "high", "medium", "low"):
         cards = [c for c in cards if c["sev_counts"].get(severity, 0) > 0]
+
+    # 섹션 ② 토픽 클러스터
+    try:
+        topic_clusters = get_topic_clusters(db, days=cluster_days)
+    except Exception as exc:  # pgvector 미설치 / 데이터 없음 시 페이지는 유지
+        import logging
+        logging.getLogger(__name__).warning("topic clustering 실패: %s", exc)
+        topic_clusters = []
 
     return _render(
         "insights.html",
         cards=cards,
         current_severity=severity or "all",
+        topic_clusters=topic_clusters,
+        cluster_days=cluster_days,
         active_page="insights",
     )
+
+
+@router.get("/insights/topics/{cluster_key}/related", response_class=HTMLResponse)
+def insights_topic_related(cluster_key: str, db: Session = Depends(get_db)):
+    """HTMX 파셜: 클러스터 → 관련 과거 뉴스레터 청크."""
+    from ....services.topic_cluster_service import get_related_newsletters
+    related = get_related_newsletters(db, cluster_key, top_k=3)
+    return _render("partials/topic_related.html", related=related)
