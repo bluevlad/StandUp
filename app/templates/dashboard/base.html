@@ -57,6 +57,13 @@
         .sidebar-nav a:hover { color: #fff; background: #334155; }
         .sidebar-nav a.active { color: #fff; background: #2563eb; }
         .sidebar-nav a .icon { width: 18px; text-align: center; }
+        .sidebar-nav a.home-link {
+            color: #cbd5e1;
+            border-bottom: 1px solid #334155;
+            margin-bottom: 8px;
+            padding-bottom: 12px;
+        }
+        .sidebar-nav a.home-link:hover { color: #fff; background: #0f172a; }
 
         /* Main content */
         .main {
@@ -363,11 +370,14 @@
 </head>
 <body>
     <nav class="sidebar">
-        <div class="sidebar-brand">
+        <a href="{{ base_path }}/" class="sidebar-brand" style="text-decoration:none; display:block;">
             StandUp
             <small>v{{ app_version }}</small>
-        </div>
+        </a>
         <div class="sidebar-nav">
+            <a href="{{ base_path }}/" class="home-link">
+                <span class="icon">&#8962;</span> 서비스 홈
+            </a>
             <a href="{{ base_path }}/dashboard" class="{% if active_page == 'home' %}active{% endif %}">
                 <span class="icon">&#9776;</span> Dashboard
             </a>
@@ -382,6 +392,9 @@
             </a>
             <a href="{{ base_path }}/dashboard/dev-plans" class="{% if active_page == 'dev_plans' %}active{% endif %}">
                 <span class="icon">&#9881;</span> Dev Plans
+            </a>
+            <a href="{{ base_path }}/dashboard/insights" class="{% if active_page == 'insights' %}active{% endif %}">
+                <span class="icon">&#9678;</span> Insights
             </a>
             <a href="{{ base_path }}/dashboard/stats" class="{% if active_page == 'stats' %}active{% endif %}">
                 <span class="icon">&#9733;</span> Statistics

@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Insights{% endblock %}
+{% block page_title %}Insights{% endblock %}
+{% block page_meta %}주차별 Tech Digest 타임라인 · 토픽 클러스터 · HopenVision 적용 플랜{% endblock %}
+
+{% block content %}
+<style>
+    .ins-tabbar { margin-bottom: 20px; }
+    .ins-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 16px;
+    }
+    .ins-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        padding: 18px 20px;
+        transition: box-shadow 0.15s, transform 0.15s;
+        cursor: pointer;
+    }
+    .ins-card:hover {
+        box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .ins-card .period {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-bottom: 4px;
+    }
+    .ins-card .headline {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+        line-height: 1.5;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .ins-sev-bar {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
+    .ins-sev {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    .ins-sev-critical { background: #ffebe9; color: #cf222e; }
+    .ins-sev-high     { background: #fff8c5; color: #9a6700; }
+    .ins-sev-medium   { background: #ddf4ff; color: #0969da; }
+    .ins-sev-low      { background: #dafbe1; color: #1a7f37; }
+    .ins-sev-other    { background: #f1f5f9; color: #64748b; }
+    .ins-meta-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #64748b;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 8px;
+    }
+    .ins-meta-row .sent { color: #16a34a; font-weight: 600; }
+    .ins-meta-row .pending { color: #d97706; font-weight: 600; }
+
+    /* Modal preview */
+    .ins-modal-bg {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15,23,42,0.55);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .ins-modal-bg.show { display: flex; }
+    .ins-modal {
+        background: #fff;
+        border-radius: 10px;
+        width: min(900px, 92vw);
+        height: min(85vh, 800px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .ins-modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 20px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .ins-modal-head h3 { font-size: 14px; color: #1e293b; }
+    .ins-modal-close {
+        background: none;
+        border: none;
+        font-size: 22px;
+        cursor: pointer;
+        color: #64748b;
+        line-height: 1;
+    }
+    .ins-modal-close:hover { color: #1e293b; }
+    .ins-modal-body { flex: 1; overflow: hidden; }
+    .ins-modal-body iframe { width: 100%; height: 100%; border: none; }
+
+    .ins-empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    /* Section placeholders for PR2/PR3 */
+    .ins-future {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 24px;
+        text-align: center;
+        color: #64748b;
+        font-size: 13px;
+        margin-top: 24px;
+    }
+</style>
+
+<!-- Section ①: Weekly Tech Digest Timeline -->
+<div class="card-header" style="margin-bottom:12px;">
+    <h2 style="font-size:15px; color:#1e293b;">① 주차별 Tech Digest</h2>
+    <span style="font-size:12px; color:#94a3b8;">{{ cards | length }}건</span>
+</div>
+
+<!-- Severity filter tabs -->
+<div class="tab-bar ins-tabbar">
+    <a href="{{ base_path }}/dashboard/insights"
+       class="{% if current_severity == 'all' %}active{% endif %}">전체</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=critical"
+       class="{% if current_severity == 'critical' %}active{% endif %}">Critical</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=high"
+       class="{% if current_severity == 'high' %}active{% endif %}">High</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=medium"
+       class="{% if current_severity == 'medium' %}active{% endif %}">Medium</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=low"
+       class="{% if current_severity == 'low' %}active{% endif %}">Low</a>
+</div>
+
+{% if cards %}
+<div class="ins-grid">
+    {% for c in cards %}
+    <div class="ins-card" onclick="openPreview('{{ c.id }}', {{ c.headline | tojson }})">
+        <div class="period">
+            {{ c.period_start.strftime('%Y-%m-%d') }} ~ {{ c.period_end.strftime('%Y-%m-%d') }}
+        </div>
+        <div class="headline">{{ c.headline }}</div>
+        <div class="ins-sev-bar">
+            {% for sev in ['critical', 'high', 'medium', 'low', 'other'] %}
+            {% if c.sev_counts[sev] > 0 %}
+            <span class="ins-sev ins-sev-{{ sev }}">{{ sev }} {{ c.sev_counts[sev] }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="ins-meta-row">
+            <span>이벤트 {{ c.source_count }}건</span>
+            {% if c.sent_at %}
+            <span class="sent">발송 {{ c.sent_at.strftime('%m-%d %H:%M') }}</span>
+            {% else %}
+            <span class="pending">미발송</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="ins-empty">
+    {% if current_severity != 'all' %}
+    선택한 severity({{ current_severity }})에 해당하는 뉴스레터가 없습니다.
+    {% else %}
+    아직 발송된 뉴스레터가 없습니다. <code>POST /api/v1/insight/weekly/run</code> 으로 즉시 생성할 수 있습니다.
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- PR2 placeholder -->
+<div class="ins-future">
+    <strong>② 기술 토픽 클러스터</strong> — pgvector 임베딩 기반 토픽 카드 · PR2 작업 예정
+</div>
+
+<!-- PR3 placeholder -->
+<div class="ins-future">
+    <strong>③ HopenVision 적용 플랜 분석</strong> — 토픽 → LLM 적용 제안 → DevPlan 자동 초안 · PR3 작업 예정
+</div>
+
+<!-- Preview modal -->
+<div class="ins-modal-bg" id="insModalBg" onclick="if(event.target===this) closePreview()">
+    <div class="ins-modal">
+        <div class="ins-modal-head">
+            <h3 id="insModalTitle">뉴스레터 미리보기</h3>
+            <button class="ins-modal-close" onclick="closePreview()">&times;</button>
+        </div>
+        <div class="ins-modal-body">
+            <iframe id="insModalFrame" sandbox="allow-same-origin"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+function openPreview(newsletterId, headline) {
+    document.getElementById('insModalTitle').textContent = headline || '뉴스레터 미리보기';
+    var frame = document.getElementById('insModalFrame');
+    frame.src = '{{ base_path }}/api/v1/insight/newsletters/' + newsletterId + '/preview';
+    document.getElementById('insModalBg').classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+function closePreview() {
+    document.getElementById('insModalBg').classList.remove('show');
+    document.getElementById('insModalFrame').src = 'about:blank';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closePreview();
+});
+</script>
+{% endblock %}
