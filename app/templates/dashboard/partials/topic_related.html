@@ -1,0 +1,18 @@
+{% if related %}
+<ul style="list-style:none; margin:0; padding:0;">
+    {% for r in related %}
+    <li style="padding:6px 0; border-top:1px solid #e2e8f0;">
+        <div style="display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#94a3b8;">
+            <span>
+                {% if r.headline %}<b style="color:#1e293b;">{{ r.headline }}</b>{% endif %}
+                {% if r.period_start %}<span style="margin-left:6px;">{{ r.period_start }} ~ {{ r.period_end }}</span>{% endif %}
+            </span>
+            <span>dist {{ "%.3f" | format(r.distance) }}</span>
+        </div>
+        <div style="margin-top:4px; color:#475569; font-size:12px;">{{ r.excerpt }}{% if r.excerpt | length >= 240 %}…{% endif %}</div>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div style="color:#94a3b8; font-size:12px;">유사한 과거 뉴스레터 청크가 없습니다.</div>
+{% endif %}
