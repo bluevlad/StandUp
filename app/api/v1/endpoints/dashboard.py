@@ -13,6 +13,7 @@ from ....core.config import settings, APP_VERSION
 from ....core.database import get_db
 from ....models.report import ReportType, ReportStatus
 from ....models.issue import WorkItem, ItemCategory, ItemStatus
+from ....models.insight import Newsletter, IngestionEvent
 from ....services.report_service import get_report_service
 from ....services.stats_service import get_stats_service
 from ....services.dev_plan_service import get_dev_plan_service
@@ -270,15 +271,18 @@ def stats_page(
 @router.get("/dev-plans", response_class=HTMLResponse)
 def dev_plans_page(db: Session = Depends(get_db)):
     """개발 플랜 현황 페이지"""
+    from ....services.hopenvision_proposal_service import get_ai_generated_plan_ids
+
     service = get_dev_plan_service()
     overall = service.get_overall_metrics(db)
     projects = service.get_project_summary(db)
 
-    # 프로젝트별 플랜 목록 (상세 링크용)
-    from sqlalchemy.orm import joinedload
+    # 프로젝트별 플랜 목록 (상세 링크용) — AI 제안 DRAFT 도 노출
     all_plans = (
         db.query(DevPlan)
-        .filter(DevPlan.status.in_([PlanStatus.ACTIVE, PlanStatus.COMPLETED]))
+        .filter(DevPlan.status.in_(
+            [PlanStatus.DRAFT, PlanStatus.ACTIVE, PlanStatus.COMPLETED]
+        ))
         .order_by(DevPlan.project_name, DevPlan.updated_at.desc())
         .all()
     )
@@ -286,11 +290,14 @@ def dev_plans_page(db: Session = Depends(get_db)):
     for plan in all_plans:
         plans_by_project.setdefault(plan.project_name, []).append(plan)
 
+    ai_generated_plan_ids = get_ai_generated_plan_ids(db)
+
     return _render(
         "dev_plans.html",
         overall=overall,
         projects=projects,
         plans_by_project=plans_by_project,
+        ai_generated_plan_ids=ai_generated_plan_ids,
         active_page="dev_plans",
     )
 
@@ -439,3 +446,117 @@ def project_detail(
         current_period=period_type,
         active_page="projects",
     )
+
+
+@router.get("/insights", response_class=HTMLResponse)
+def insights_page(
+    severity: str = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    cluster_days: int = Query(default=30, ge=7, le=120),
+    db: Session = Depends(get_db),
+):
+    """Insight 통합 페이지 — ① Tech Digest + ② 토픽 클러스터 + (③ PR3 placeholder)"""
+    from sqlalchemy import select
+    from ....services.topic_cluster_service import get_topic_clusters
+
+    nl_q = select(Newsletter).order_by(Newsletter.created_at.desc()).limit(limit)
+    newsletters = db.scalars(nl_q).all()
+
+    # 각 뉴스레터의 source 이벤트 severity 분포 집계
+    cards = []
+    for nl in newsletters:
+        sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "other": 0}
+        if nl.source_event_ids:
+            ev_rows = db.scalars(
+                select(IngestionEvent.severity).where(
+                    IngestionEvent.id.in_(nl.source_event_ids)
+                )
+            ).all()
+            for sev in ev_rows:
+                key = (sev or "other").lower()
+                if key not in sev_counts:
+                    key = "other"
+                sev_counts[key] += 1
+        cards.append({
+            "id": str(nl.id),
+            "period_start": nl.period_start,
+            "period_end": nl.period_end,
+            "headline": nl.headline,
+            "subject": nl.subject,
+            "created_at": nl.created_at,
+            "sent_at": nl.sent_at,
+            "source_count": len(nl.source_event_ids or []),
+            "kpis": nl.kpis or {},
+            "sev_counts": sev_counts,
+        })
+
+    if severity in ("critical", "high", "medium", "low"):
+        cards = [c for c in cards if c["sev_counts"].get(severity, 0) > 0]
+
+    # 섹션 ② 토픽 클러스터
+    try:
+        topic_clusters = get_topic_clusters(db, days=cluster_days)
+    except Exception as exc:  # pgvector 미설치 / 데이터 없음 시 페이지는 유지
+        import logging
+        logging.getLogger(__name__).warning("topic clustering 실패: %s", exc)
+        topic_clusters = []
+
+    return _render(
+        "insights.html",
+        cards=cards,
+        current_severity=severity or "all",
+        topic_clusters=topic_clusters,
+        cluster_days=cluster_days,
+        active_page="insights",
+    )
+
+
+@router.get("/insights/topics/{cluster_key}/related", response_class=HTMLResponse)
+def insights_topic_related(cluster_key: str, db: Session = Depends(get_db)):
+    """HTMX 파셜: 클러스터 → 관련 과거 뉴스레터 청크."""
+    from ....services.topic_cluster_service import get_related_newsletters
+    related = get_related_newsletters(db, cluster_key, top_k=3)
+    return _render("partials/topic_related.html", related=related)
+
+
+@router.post("/insights/topics/{cluster_key}/hopenvision/generate",
+             response_class=HTMLResponse)
+def insights_hopenvision_generate(
+    cluster_key: str,
+    force: bool = Query(default=False),
+    db: Session = Depends(get_db),
+):
+    """HTMX: 토픽 클러스터 → HopenVision 적용 LLM 제안 생성/조회."""
+    from ....services.hopenvision_proposal_service import generate_proposal
+    try:
+        result = generate_proposal(db, cluster_key, force=force)
+    except ValueError as e:
+        return _render("partials/hopenvision_proposal.html",
+                       error=str(e), proposal=None)
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception("hopenvision generate 실패")
+        return _render("partials/hopenvision_proposal.html",
+                       error=f"제안 생성 중 오류: {e}", proposal=None)
+    return _render("partials/hopenvision_proposal.html",
+                   proposal=result, error=None)
+
+
+@router.post("/insights/proposals/{proposal_id}/accept",
+             response_class=HTMLResponse)
+def insights_hopenvision_accept(proposal_id: str, db: Session = Depends(get_db)):
+    """HTMX: 제안 수락 → DevPlan 자동 초안 생성."""
+    from ....services.hopenvision_proposal_service import accept_as_dev_plan
+    try:
+        plan = accept_as_dev_plan(db, proposal_id)
+    except ValueError as e:
+        html = f'<div style="color:#cf222e; font-size:12px;">{e}</div>'
+        return HTMLResponse(content=html, status_code=400)
+    href = f"{settings.root_path}/dashboard/dev-plans/{plan.id}"
+    html = (
+        f'<div style="color:#16a34a; font-size:12px; padding:8px 0;">'
+        f'✓ DevPlan 초안 생성됨 — '
+        f'<a href="{href}" style="color:#2563eb; text-decoration:underline;">'
+        f'#{plan.id} {plan.title}</a></div>'
+    )
+    return HTMLResponse(content=html)

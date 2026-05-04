@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Insights{% endblock %}
+{% block page_title %}Insights{% endblock %}
+{% block page_meta %}주차별 Tech Digest 타임라인 · 토픽 클러스터 · HopenVision 적용 플랜{% endblock %}
+
+{% block content %}
+<style>
+    .ins-tabbar { margin-bottom: 20px; }
+    .ins-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+        gap: 16px;
+    }
+    .ins-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        padding: 18px 20px;
+        transition: box-shadow 0.15s, transform 0.15s;
+        cursor: pointer;
+    }
+    .ins-card:hover {
+        box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    .ins-card .period {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-bottom: 4px;
+    }
+    .ins-card .headline {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1e293b;
+        line-height: 1.5;
+        margin-bottom: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .ins-sev-bar {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+    }
+    .ins-sev {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    .ins-sev-critical { background: #ffebe9; color: #cf222e; }
+    .ins-sev-high     { background: #fff8c5; color: #9a6700; }
+    .ins-sev-medium   { background: #ddf4ff; color: #0969da; }
+    .ins-sev-low      { background: #dafbe1; color: #1a7f37; }
+    .ins-sev-other    { background: #f1f5f9; color: #64748b; }
+    .ins-meta-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #64748b;
+        border-top: 1px solid #f1f5f9;
+        padding-top: 8px;
+    }
+    .ins-meta-row .sent { color: #16a34a; font-weight: 600; }
+    .ins-meta-row .pending { color: #d97706; font-weight: 600; }
+
+    /* Modal preview */
+    .ins-modal-bg {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15,23,42,0.55);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .ins-modal-bg.show { display: flex; }
+    .ins-modal {
+        background: #fff;
+        border-radius: 10px;
+        width: min(900px, 92vw);
+        height: min(85vh, 800px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .ins-modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 20px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+    }
+    .ins-modal-head h3 { font-size: 14px; color: #1e293b; }
+    .ins-modal-close {
+        background: none;
+        border: none;
+        font-size: 22px;
+        cursor: pointer;
+        color: #64748b;
+        line-height: 1;
+    }
+    .ins-modal-close:hover { color: #1e293b; }
+    .ins-modal-body { flex: 1; overflow: hidden; }
+    .ins-modal-body iframe { width: 100%; height: 100%; border: none; }
+
+    .ins-empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    /* Section placeholders for PR2/PR3 */
+    .ins-future {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 24px;
+        text-align: center;
+        color: #64748b;
+        font-size: 13px;
+        margin-top: 24px;
+    }
+</style>
+
+<!-- Section ①: Weekly Tech Digest Timeline -->
+<div class="card-header" style="margin-bottom:12px;">
+    <h2 style="font-size:15px; color:#1e293b;">① 주차별 Tech Digest</h2>
+    <span style="font-size:12px; color:#94a3b8;">{{ cards | length }}건</span>
+</div>
+
+<!-- Severity filter tabs -->
+<div class="tab-bar ins-tabbar">
+    <a href="{{ base_path }}/dashboard/insights"
+       class="{% if current_severity == 'all' %}active{% endif %}">전체</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=critical"
+       class="{% if current_severity == 'critical' %}active{% endif %}">Critical</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=high"
+       class="{% if current_severity == 'high' %}active{% endif %}">High</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=medium"
+       class="{% if current_severity == 'medium' %}active{% endif %}">Medium</a>
+    <a href="{{ base_path }}/dashboard/insights?severity=low"
+       class="{% if current_severity == 'low' %}active{% endif %}">Low</a>
+</div>
+
+{% if cards %}
+<div class="ins-grid">
+    {% for c in cards %}
+    <div class="ins-card" onclick="openPreview('{{ c.id }}', {{ c.headline | tojson }})">
+        <div class="period">
+            {{ c.period_start.strftime('%Y-%m-%d') }} ~ {{ c.period_end.strftime('%Y-%m-%d') }}
+        </div>
+        <div class="headline">{{ c.headline }}</div>
+        <div class="ins-sev-bar">
+            {% for sev in ['critical', 'high', 'medium', 'low', 'other'] %}
+            {% if c.sev_counts[sev] > 0 %}
+            <span class="ins-sev ins-sev-{{ sev }}">{{ sev }} {{ c.sev_counts[sev] }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="ins-meta-row">
+            <span>이벤트 {{ c.source_count }}건</span>
+            {% if c.sent_at %}
+            <span class="sent">발송 {{ c.sent_at.strftime('%m-%d %H:%M') }}</span>
+            {% else %}
+            <span class="pending">미발송</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="ins-empty">
+    {% if current_severity != 'all' %}
+    선택한 severity({{ current_severity }})에 해당하는 뉴스레터가 없습니다.
+    {% else %}
+    아직 발송된 뉴스레터가 없습니다. <code>POST /api/v1/insight/weekly/run</code> 으로 즉시 생성할 수 있습니다.
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Section ②: Tech Topic Clusters -->
+<div class="card-header" style="margin-top:32px; margin-bottom:12px;">
+    <h2 style="font-size:15px; color:#1e293b;">② 기술 토픽 클러스터</h2>
+    <span style="font-size:12px; color:#94a3b8;">최근 {{ cluster_days }}일 · {{ topic_clusters | length }}개 토픽</span>
+</div>
+
+<style>
+    .topic-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 16px;
+    }
+    .topic-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        padding: 16px 18px;
+    }
+    .topic-keywords { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .topic-kw {
+        background: #eef2ff;
+        color: #3730a3;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+    .topic-kw:first-child {
+        background: #2563eb;
+        color: #fff;
+    }
+    .topic-meta {
+        display: flex;
+        gap: 12px;
+        font-size: 11px;
+        color: #64748b;
+        margin-bottom: 10px;
+    }
+    .topic-meta b { color: #1e293b; }
+    .topic-events { margin-top: 8px; }
+    .topic-events summary {
+        cursor: pointer;
+        font-size: 12px;
+        color: #2563eb;
+        padding: 4px 0;
+    }
+    .topic-events summary:hover { text-decoration: underline; }
+    .topic-events ul {
+        list-style: none;
+        margin: 6px 0;
+        padding: 0;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    .topic-events li {
+        font-size: 12px;
+        color: #475569;
+        padding: 6px 0;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+    }
+    .topic-events li .ev-date { color: #94a3b8; font-size: 11px; flex-shrink: 0; min-width: 70px; }
+    .topic-events li .ev-title a { color: #2563eb; text-decoration: none; }
+    .topic-events li .ev-title a:hover { text-decoration: underline; }
+    .topic-related-load {
+        margin-top: 10px;
+        font-size: 12px;
+        color: #2563eb;
+        cursor: pointer;
+        background: none;
+        border: none;
+        padding: 0;
+        text-decoration: underline;
+    }
+    .topic-related-out {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #475569;
+        background: #f8fafc;
+        border-radius: 6px;
+        padding: 0;
+    }
+    .topic-related-out:not(:empty) { padding: 10px 12px; }
+    .topic-empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: #94a3b8;
+        font-size: 13px;
+        background: #fff;
+        border-radius: 8px;
+    }
+</style>
+
+{% if topic_clusters %}
+<div class="topic-grid">
+    {% for tc in topic_clusters %}
+    <div class="topic-card">
+        <div class="topic-keywords">
+            {% for kw in tc.keywords %}
+            <span class="topic-kw">{{ kw }}</span>
+            {% endfor %}
+        </div>
+        <div class="topic-meta">
+            <span>이벤트 <b>{{ tc.event_count }}</b>건</span>
+            <span>청크 <b>{{ tc.chunk_count }}</b>개</span>
+            <span>{{ tc.first_seen.strftime('%m-%d') }} ~ {{ tc.last_seen.strftime('%m-%d') }}</span>
+        </div>
+        <div class="ins-sev-bar">
+            {% for sev, cnt in tc.severity_mix.items() %}
+            {% if cnt > 0 %}
+            <span class="ins-sev ins-sev-{{ sev }}">{{ sev }} {{ cnt }}</span>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <details class="topic-events">
+            <summary>이벤트 {{ tc.event_count }}건 펼치기</summary>
+            <ul>
+                {% for e in tc.events %}
+                <li>
+                    <span class="ev-date">{{ e.occurred_at.strftime('%m-%d %H:%M') }}</span>
+                    <span class="ev-title">
+                        {% if e.source_url %}
+                        <a href="{{ e.source_url }}" target="_blank" rel="noopener">{{ e.title or '(제목 없음)' }}</a>
+                        {% else %}
+                        {{ e.title or '(제목 없음)' }}
+                        {% endif %}
+                        {% if e.service_tag %}<span style="color:#94a3b8;"> · {{ e.service_tag }}</span>{% endif %}
+                    </span>
+                </li>
+                {% endfor %}
+            </ul>
+        </details>
+        <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:6px;">
+            <button class="topic-related-load"
+                    hx-get="{{ base_path }}/dashboard/insights/topics/{{ tc.cluster_key }}/related"
+                    hx-target="next .topic-related-out"
+                    hx-swap="innerHTML"
+                    hx-disabled-elt="this">
+                관련 과거 뉴스레터 보기
+            </button>
+            <button class="topic-related-load topic-hv-btn"
+                    hx-post="{{ base_path }}/dashboard/insights/topics/{{ tc.cluster_key }}/hopenvision/generate"
+                    hx-target="next .topic-hv-out"
+                    hx-swap="innerHTML"
+                    hx-indicator="next .topic-hv-out"
+                    hx-disabled-elt="this">
+                HopenVision 에 적용 (LLM)
+            </button>
+        </div>
+        <div class="topic-related-out"></div>
+        <div class="topic-hv-out"></div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="topic-empty">
+    최근 {{ cluster_days }}일간 임계치({{ "0.35" }}) 이하로 묶이는 토픽 클러스터가 없습니다.
+    수집 청크가 적거나 임베딩 미생성 상태일 수 있습니다.
+</div>
+{% endif %}
+
+<!-- Section ③: HopenVision Application Plan -->
+<div class="card-header" style="margin-top:32px; margin-bottom:12px;">
+    <h2 style="font-size:15px; color:#1e293b;">③ HopenVision 적용 플랜 (AI 제안)</h2>
+    <span style="font-size:12px; color:#94a3b8;">토픽 카드의 "HopenVision 에 적용" 버튼으로 LLM 분석</span>
+</div>
+<div style="background:#fff; border-radius:8px; padding:14px 18px; box-shadow:0 1px 3px rgba(0,0,0,0.06); font-size:13px; color:#475569; line-height:1.7;">
+    각 토픽 카드의 <code style="background:#f6f8fa; padding:1px 5px; border-radius:3px;">HopenVision 에 적용 (LLM)</code> 버튼을 누르면 exaone3.5 가 토픽 + 최근 hopenvision WorkItem 을 보고 적용 후보 모듈/리스크/우선순위 JSON 을 작성합니다.
+    이후 "DevPlan 으로 만들기"를 누르면 <a href="{{ base_path }}/dashboard/dev-plans" style="color:#2563eb;">Dev Plans</a> 화면에 <span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:8px; font-size:11px; font-weight:600;">AI 제안</span> 라벨이 붙은 DRAFT 플랜으로 자동 초안화됩니다.
+</div>
+
+<!-- Preview modal -->
+<div class="ins-modal-bg" id="insModalBg" onclick="if(event.target===this) closePreview()">
+    <div class="ins-modal">
+        <div class="ins-modal-head">
+            <h3 id="insModalTitle">뉴스레터 미리보기</h3>
+            <button class="ins-modal-close" onclick="closePreview()">&times;</button>
+        </div>
+        <div class="ins-modal-body">
+            <iframe id="insModalFrame" sandbox="allow-same-origin"></iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+function openPreview(newsletterId, headline) {
+    document.getElementById('insModalTitle').textContent = headline || '뉴스레터 미리보기';
+    var frame = document.getElementById('insModalFrame');
+    frame.src = '{{ base_path }}/api/v1/insight/newsletters/' + newsletterId + '/preview';
+    document.getElementById('insModalBg').classList.add('show');
+    document.body.style.overflow = 'hidden';
+}
+function closePreview() {
+    document.getElementById('insModalBg').classList.remove('show');
+    document.getElementById('insModalFrame').src = 'about:blank';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closePreview();
+});
+</script>
+{% endblock %}
