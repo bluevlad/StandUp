@@ -9,7 +9,8 @@ Insight Newsletter (v2) 모델
 import uuid
 
 from sqlalchemy import (
-    BigInteger, Column, Date, DateTime, ForeignKey, String, Text, UniqueConstraint, func,
+    BigInteger, Column, Date, DateTime, ForeignKey, Integer, String, Text,
+    UniqueConstraint, func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import relationship
@@ -87,6 +88,33 @@ class NewsletterChunk(Base):
         embedding = Column(Vector(768), nullable=True)
 
     event = relationship("IngestionEvent", lazy="joined", foreign_keys=[event_id])
+
+
+class HopenVisionProposal(Base):
+    """토픽 클러스터 → HopenVision 적용 LLM 제안 (PR3).
+
+    DevPlan 자동 초안화 전 단계의 캐시. status 가 'accepted' 가 되면
+    dev_plan_id 가 채워진다.
+    """
+    __tablename__ = "hopenvision_proposals"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4,
+                server_default=func.gen_random_uuid())
+    cluster_key = Column(String(40), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    model = Column(String(80), nullable=False)
+    status = Column(String(20), nullable=False, default="generated",
+                    server_default="generated")  # generated|accepted|failed
+    cluster_keywords = Column(ARRAY(String), nullable=False, default=list,
+                              server_default="{}")
+    diagnosis = Column(Text, nullable=True)
+    candidate_modules = Column(JSONB, nullable=False, default=list, server_default="[]")
+    risks = Column(JSONB, nullable=False, default=list, server_default="[]")
+    priority = Column(String(10), nullable=True)
+    raw_response = Column(Text, nullable=True)
+    eval_ms = Column(Integer, nullable=True)
+    dev_plan_id = Column(Integer, ForeignKey("dev_plans.id", ondelete="SET NULL"),
+                         nullable=True, index=True)
 
 
 # Collection 상수

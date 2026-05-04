@@ -238,6 +238,9 @@
             <a href="{{ base_path }}/dashboard/dev-plans/{{ plan.id }}"
                style="font-size:12px; color:#2563eb; text-decoration:none; margin-left:12px;">
                 {{ plan.title }}
+                {% if plan.id in ai_generated_plan_ids %}
+                <span class="plan-status-badge" style="background:#fef3c7; color:#92400e;">AI 제안</span>
+                {% endif %}
                 <span class="plan-status-badge plan-status-{{ plan.status.value }}">{{ plan.status.value }}</span>
                 &rarr;
             </a>

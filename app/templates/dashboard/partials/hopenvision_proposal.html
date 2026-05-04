@@ -1,0 +1,73 @@
+{% if error %}
+<div style="margin-top:8px; padding:10px 12px; background:#ffebe9; color:#cf222e;
+            border-radius:6px; font-size:12px;">
+    ⚠ {{ error }}
+</div>
+{% elif proposal %}
+<div style="margin-top:10px; background:#f8fafc; border:1px solid #e2e8f0;
+            border-radius:8px; padding:12px 14px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:11px; color:#94a3b8;">
+            model={{ proposal.model }} · {{ proposal.eval_ms }}ms
+            {% if proposal.priority %}· <b style="color:#1e293b;">{{ proposal.priority }}</b>{% endif %}
+        </span>
+        {% if proposal.status == 'failed' %}
+        <span style="font-size:11px; color:#cf222e;">JSON 파싱 실패 — raw 확인 필요</span>
+        {% endif %}
+    </div>
+
+    {% if proposal.diagnosis %}
+    <div style="margin-bottom:10px;">
+        <div style="font-size:11px; font-weight:600; color:#64748b; margin-bottom:4px;">진단</div>
+        <div style="font-size:12px; color:#334155; line-height:1.6;">{{ proposal.diagnosis }}</div>
+    </div>
+    {% endif %}
+
+    {% if proposal.candidate_modules %}
+    <div style="margin-bottom:10px;">
+        <div style="font-size:11px; font-weight:600; color:#64748b; margin-bottom:4px;">적용 후보 모듈</div>
+        <ul style="margin:0; padding-left:18px; font-size:12px;">
+            {% for m in proposal.candidate_modules %}
+            <li style="margin-bottom:4px;">
+                <b style="color:#1e293b;">{{ m.module }}</b>
+                {% if m.effort %}<span style="background:#e0e7ff; color:#3730a3; padding:1px 6px; border-radius:8px; font-size:10px; margin-left:4px;">{{ m.effort }}</span>{% endif %}
+                {% if m.rationale %}<div style="color:#475569; margin-top:2px;">{{ m.rationale }}</div>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if proposal.risks %}
+    <div style="margin-bottom:10px;">
+        <div style="font-size:11px; font-weight:600; color:#64748b; margin-bottom:4px;">예상 리스크</div>
+        <ul style="margin:0; padding-left:18px; font-size:12px; color:#475569;">
+            {% for r in proposal.risks %}
+            <li>{{ r }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if proposal.status == 'generated' and proposal.candidate_modules %}
+    <button class="topic-related-load"
+            hx-post="{{ base_path }}/dashboard/insights/proposals/{{ proposal.proposal_id }}/accept"
+            hx-target="next .hv-accept-out"
+            hx-swap="innerHTML"
+            hx-disabled-elt="this"
+            style="margin-top:6px;">
+        DevPlan 으로 만들기
+    </button>
+    <div class="hv-accept-out"></div>
+    {% endif %}
+
+    {% if proposal.status == 'failed' and proposal.raw_response %}
+    <details style="margin-top:8px;">
+        <summary style="font-size:11px; color:#94a3b8; cursor:pointer;">raw response (debug)</summary>
+        <pre style="font-size:11px; background:#f6f8fa; padding:8px; border-radius:4px; max-height:240px; overflow:auto; white-space:pre-wrap;">{{ proposal.raw_response }}</pre>
+    </details>
+    {% endif %}
+</div>
+{% else %}
+<div style="font-size:12px; color:#94a3b8; padding:8px 0;">제안 데이터가 없습니다.</div>
+{% endif %}
