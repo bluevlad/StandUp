@@ -13,6 +13,7 @@ from ....core.config import settings, APP_VERSION
 from ....core.database import get_db
 from ....models.report import ReportType, ReportStatus
 from ....models.issue import WorkItem, ItemCategory, ItemStatus
+from ....models.insight import Newsletter, IngestionEvent
 from ....services.report_service import get_report_service
 from ....services.stats_service import get_stats_service
 from ....services.dev_plan_service import get_dev_plan_service
@@ -438,4 +439,56 @@ def project_detail(
         all_items=all_items,
         current_period=period_type,
         active_page="projects",
+    )
+
+
+@router.get("/insights", response_class=HTMLResponse)
+def insights_page(
+    severity: str = Query(default=None),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Insight 뉴스레터 타임라인 (PR1: 섹션 ① 주차별 Tech Digest)"""
+    from sqlalchemy import select
+
+    nl_q = select(Newsletter).order_by(Newsletter.created_at.desc()).limit(limit)
+    newsletters = db.scalars(nl_q).all()
+
+    # 각 뉴스레터의 source 이벤트 severity 분포 집계
+    cards = []
+    for nl in newsletters:
+        sev_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "other": 0}
+        if nl.source_event_ids:
+            ev_rows = db.scalars(
+                select(IngestionEvent.severity).where(
+                    IngestionEvent.id.in_(nl.source_event_ids)
+                )
+            ).all()
+            for sev in ev_rows:
+                key = (sev or "other").lower()
+                if key not in sev_counts:
+                    key = "other"
+                sev_counts[key] += 1
+        cards.append({
+            "id": str(nl.id),
+            "period_start": nl.period_start,
+            "period_end": nl.period_end,
+            "headline": nl.headline,
+            "subject": nl.subject,
+            "created_at": nl.created_at,
+            "sent_at": nl.sent_at,
+            "source_count": len(nl.source_event_ids or []),
+            "kpis": nl.kpis or {},
+            "sev_counts": sev_counts,
+        })
+
+    # severity 필터 적용 (해당 severity 가 1건 이상인 카드만)
+    if severity in ("critical", "high", "medium", "low"):
+        cards = [c for c in cards if c["sev_counts"].get(severity, 0) > 0]
+
+    return _render(
+        "insights.html",
+        cards=cards,
+        current_severity=severity or "all",
+        active_page="insights",
     )
