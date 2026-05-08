@@ -49,7 +49,7 @@ class ChunkSpec:
     """RAG 색인용 청크 사양 — connector 가 권장하는 분할."""
 
     text: str
-    collection: str            # corpus_qa|corpus_logs|corpus_fixes
+    collection: str            # corpus_qa|corpus_logs|corpus_fixes|corpus_tech
     metadata: dict[str, Any] = field(default_factory=dict)
 
 

@@ -9,9 +9,11 @@ from ..base import Connector
 from .loganalyzer import LogAnalyzerConnector
 from .github_qa import GitHubQAConnector
 from .auto_tobe import AutoTobeConnector
+from .tech_trend import TechTrendConnector
 
 __all__ = [
     "LogAnalyzerConnector", "GitHubQAConnector", "AutoTobeConnector",
+    "TechTrendConnector",
     "build_connectors",
 ]
 
@@ -38,6 +40,12 @@ def build_connectors() -> list[Connector]:
         connectors.append(AutoTobeConnector(
             journal_glob=settings.auto_tobe_journal_glob,
             git_repos=settings.auto_tobe_git_repo_list,
+        ))
+
+    if settings.tech_trend_enabled:
+        connectors.append(TechTrendConnector(
+            keywords=settings.tech_trend_keyword_list,
+            reports_dir=settings.medium_digest_reports_dir,
         ))
 
     return connectors

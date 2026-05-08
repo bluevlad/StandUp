@@ -93,6 +93,22 @@ class Settings(BaseSettings):
     auto_tobe_journal_glob: str = Field(default="", env="AUTO_TOBE_JOURNAL_GLOB")  # 예: /work/*/AUTO_TOBE_*.md
     auto_tobe_git_repos: str = Field(default="", env="AUTO_TOBE_GIT_REPOS")  # ":" 구분 로컬 경로
 
+    # Tech Trend (Medium Daily Digest 리포트 + Google/Naver 뉴스 검색)
+    tech_trend_enabled: bool = Field(default=False, env="TECH_TREND_ENABLED")
+    tech_trend_keywords: str = Field(
+        default="java,spring,react", env="TECH_TREND_KEYWORDS",
+    )  # 콤마 구분 — 뉴스 검색 키워드, 디지스트 결과 키워드 필터에도 사용
+    medium_digest_reports_dir: str = Field(
+        default="", env="MEDIUM_DIGEST_REPORTS_DIR",
+    )  # 예: /Users/rainend/GIT/medium-digest-agent/reports
+    tech_news_max_per_keyword: int = Field(default=5, env="TECH_NEWS_MAX_PER_KEYWORD")
+    tech_news_workers: int = Field(default=4, env="TECH_NEWS_WORKERS")
+    tech_news_timeout_sec: int = Field(default=15, env="TECH_NEWS_TIMEOUT_SEC")
+
+    # Naver News API (선택 — 미설정 시 Google News RSS 만 사용)
+    naver_client_id: str = Field(default="", env="NAVER_CLIENT_ID")
+    naver_client_secret: str = Field(default="", env="NAVER_CLIENT_SECRET")
+
     # 합성 윈도우
     insight_window_days: int = Field(default=7, env="INSIGHT_WINDOW_DAYS")
     insight_subject_prefix: str = Field(default="[StandUp Insight]", env="INSIGHT_SUBJECT_PREFIX")
@@ -115,6 +131,10 @@ class Settings(BaseSettings):
     @property
     def auto_tobe_git_repo_list(self) -> list[str]:
         return [r.strip() for r in self.auto_tobe_git_repos.split(":") if r.strip()]
+
+    @property
+    def tech_trend_keyword_list(self) -> list[str]:
+        return [k.strip() for k in self.tech_trend_keywords.split(",") if k.strip()]
 
     @property
     def is_insight_mode(self) -> bool:
