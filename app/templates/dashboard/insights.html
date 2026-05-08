@@ -358,6 +358,76 @@
     이후 "DevPlan 으로 만들기"를 누르면 <a href="{{ base_path }}/dashboard/dev-plans" style="color:#2563eb;">Dev Plans</a> 화면에 <span style="background:#fef3c7; color:#92400e; padding:1px 6px; border-radius:8px; font-size:11px; font-weight:600;">AI 제안</span> 라벨이 붙은 DRAFT 플랜으로 자동 초안화됩니다.
 </div>
 
+<!-- Section ④: tech-trend (Medium Digest + Google/Naver News) 자동 제안 -->
+<div class="card-header" style="margin-top:32px; margin-bottom:12px;">
+    <h2 style="font-size:15px; color:#1e293b;">④ 기술 토픽 자동 제안 (tech-trend)</h2>
+    <span style="font-size:12px; color:#94a3b8;">주간 합성 시 외부 기술 동향(Java/React 등)에서 자동 생성된 HopenVision 적용 제안</span>
+</div>
+{% if tech_trend_proposals %}
+<div class="topic-grid">
+    {% for p in tech_trend_proposals %}
+    <div class="topic-card">
+        <div class="topic-keywords">
+            {% for kw in p.cluster_keywords %}
+            <span class="topic-kw">{{ kw }}</span>
+            {% endfor %}
+            {% if p.priority %}
+            <span class="topic-kw" style="background:#fef3c7; color:#92400e;">{{ p.priority }}</span>
+            {% endif %}
+            {% if p.status == 'accepted' %}
+            <span class="topic-kw" style="background:#dafbe1; color:#1a7f37;">DevPlan 초안화 완료</span>
+            {% elif p.status == 'failed' %}
+            <span class="topic-kw" style="background:#ffebe9; color:#cf222e;">생성 실패</span>
+            {% endif %}
+        </div>
+        <div class="topic-meta">
+            <span>생성 <b>{{ p.created_at.strftime('%m-%d %H:%M') }}</b></span>
+            <span>모델: {{ p.model }}</span>
+            {% if p.eval_ms %}<span>{{ p.eval_ms }}ms</span>{% endif %}
+        </div>
+        {% if p.diagnosis %}
+        <div style="font-size:13px; color:#1e293b; line-height:1.6; margin:8px 0; padding:8px 10px; background:#f8fafc; border-radius:6px;">
+            {{ p.diagnosis }}
+        </div>
+        {% endif %}
+        {% if p.candidate_modules %}
+        <details>
+            <summary style="font-size:12px; color:#475569; cursor:pointer;">후보 모듈 {{ p.candidate_modules | length }}건</summary>
+            <ul style="font-size:12px; color:#334155; margin:6px 0 0; padding-left:18px;">
+                {% for m in p.candidate_modules %}
+                <li>
+                    <b>{{ m.module }}</b>
+                    {% if m.effort %}<span style="color:#94a3b8;"> · {{ m.effort }}</span>{% endif %}
+                    {% if m.rationale %}<div style="color:#64748b; font-size:11.5px;">{{ m.rationale }}</div>{% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+        {% if p.risks %}
+        <details style="margin-top:6px;">
+            <summary style="font-size:12px; color:#475569; cursor:pointer;">리스크 {{ p.risks | length }}건</summary>
+            <ul style="font-size:11.5px; color:#64748b; margin:6px 0 0; padding-left:18px;">
+                {% for r in p.risks %}
+                <li>{{ r }}</li>
+                {% endfor %}
+            </ul>
+        </details>
+        {% endif %}
+        {% if p.dev_plan_id %}
+        <div style="margin-top:8px; font-size:12px;">
+            → <a href="{{ base_path }}/dashboard/dev-plans/{{ p.dev_plan_id }}" style="color:#2563eb; text-decoration:underline;">DevPlan #{{ p.dev_plan_id }} 보기</a>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="topic-empty">
+    아직 자동 생성된 기술 토픽 제안이 없습니다. <code style="background:#f6f8fa; padding:1px 5px; border-radius:3px;">TECH_TREND_ENABLED=true</code> 로 설정하고 주간 합성이 한 번 실행되면 여기에 카드가 채워집니다.
+</div>
+{% endif %}
+
 <!-- Preview modal -->
 <div class="ins-modal-bg" id="insModalBg" onclick="if(event.target===this) closePreview()">
     <div class="ins-modal">

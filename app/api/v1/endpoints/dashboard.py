@@ -455,9 +455,12 @@ def insights_page(
     cluster_days: int = Query(default=30, ge=7, le=120),
     db: Session = Depends(get_db),
 ):
-    """Insight 통합 페이지 — ① Tech Digest + ② 토픽 클러스터 + (③ PR3 placeholder)"""
+    """Insight 통합 페이지 — ① Tech Digest + ② 토픽 클러스터 + ③ HopenVision 가이드 + ④ 기술 토픽 자동 제안"""
     from sqlalchemy import select
     from ....services.topic_cluster_service import get_topic_clusters
+    from ....services.hopenvision_proposal_service import (
+        list_tech_topic_proposals,
+    )
 
     nl_q = select(Newsletter).order_by(Newsletter.created_at.desc()).limit(limit)
     newsletters = db.scalars(nl_q).all()
@@ -501,12 +504,21 @@ def insights_page(
         logging.getLogger(__name__).warning("topic clustering 실패: %s", exc)
         topic_clusters = []
 
+    # 섹션 ④ 기술 토픽 자동 제안 (orchestrator 가 주간 합성 후 자동 생성)
+    try:
+        tech_trend_proposals = list_tech_topic_proposals(db, limit=10)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("tech_trend proposals 조회 실패: %s", exc)
+        tech_trend_proposals = []
+
     return _render(
         "insights.html",
         cards=cards,
         current_severity=severity or "all",
         topic_clusters=topic_clusters,
         cluster_days=cluster_days,
+        tech_trend_proposals=tech_trend_proposals,
         active_page="insights",
     )
 

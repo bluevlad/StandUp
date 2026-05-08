@@ -18,7 +18,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ..core.config import now_kst, settings
-from ..synthesis.pipeline import SynthesisOutput
+from ..synthesis.pipeline import SynthesisOutput, TechTopic
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +131,31 @@ def _replace_refs(html_body: str) -> str:
     return REF_PATTERN.sub(repl, html_body)
 
 
+def _build_tech_topic_items(topics: list[TechTopic]) -> list[dict]:
+    """TechTopic → 템플릿이 바로 쓸 수 있는 dict 리스트로 변환.
+
+    digest_url 이 file:// 스킴이면 안전상 외부 링크로 노출하지 않고 텍스트만 표시.
+    """
+    out: list[dict] = []
+    for t in topics:
+        digest_url = t.digest_url
+        digest_url_safe = digest_url if digest_url.startswith(("http://", "https://")) else ""
+        out.append({
+            "keyword": t.keyword,
+            "digest_title": t.digest_title,
+            "digest_priority": (t.digest_priority or "").lower(),
+            "digest_category": t.digest_category,
+            "digest_difficulty": t.digest_difficulty,
+            "digest_maturity": t.digest_maturity,
+            "digest_summary": t.digest_summary,
+            "digest_target_scope": t.digest_target_scope,
+            "digest_risks": t.digest_risks,
+            "digest_url": digest_url_safe,
+            "news_articles": t.news_articles,
+        })
+    return out
+
+
 def _build_kpi_items(kpis: dict) -> list[dict]:
     items: list[dict] = []
     s = kpis.get("loganalyzer_summary") or {}
@@ -171,6 +196,7 @@ def render_newsletter(syn: SynthesisOutput) -> dict:
         period_end=syn.period_end.isoformat(),
         generated_at=now_kst().strftime("%Y-%m-%d %H:%M KST"),
         kpi_items=_build_kpi_items(syn.kpis),
+        tech_topics=_build_tech_topic_items(syn.tech_topics),
         body_html=body_html,
         feedback_up=feedback_up,
         feedback_down=feedback_down,

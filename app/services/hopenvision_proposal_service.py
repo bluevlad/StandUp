@@ -1,19 +1,26 @@
 """
 HopenVision 적용 플랜 제안 서비스 (PR3).
 
-- 입력: topic_cluster_service 의 클러스터 + 최근 hopenvision WorkItem context
-- LLM(exaone3.5) 호출 → 구조화 JSON {diagnosis, candidate_modules, risks, priority}
-- 결과를 hopenvision_proposals 테이블에 캐시
-- 사용자 수락 시 DevPlan 자동 초안화
+두 가지 트리거:
+
+1. **클러스터 기반** (기존, dashboard 수동) — `generate_proposal(cluster_key)`
+   topic_cluster_service 의 클러스터 + 최근 hopenvision WorkItem context →
+   LLM JSON {diagnosis, candidate_modules, risks, priority} → cache → 수락 시 DevPlan.
+
+2. **기술 토픽 기반** (신규, 주간 orchestrator 자동) — `propose_from_tech_topics(topics)`
+   tech_trend connector 가 수집한 Medium Digest + 뉴스 토픽 묶음을 같은 LLM 인터페이스로
+   재사용. cluster_key 는 `tech:<slug>` prefix 로 구분되며, env 옵션에 따라 즉시 DevPlan
+   초안화까지 자동 진행한다.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,6 +33,9 @@ from ..models.insight import HopenVisionProposal
 from ..models.issue import WorkItem
 from ..synthesis.ollama_client import chat
 from .topic_cluster_service import get_topic_clusters
+
+if TYPE_CHECKING:
+    from ..synthesis.pipeline import TechTopic
 
 logger = logging.getLogger(__name__)
 
@@ -305,3 +315,248 @@ def get_ai_generated_plan_ids(session: Session) -> set[int]:
                HopenVisionProposal.status == "accepted")
     ).all()
     return {r[0] for r in rows if r[0] is not None}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# 기술 토픽 기반 제안 (tech_trend connector + 주간 orchestrator 통합)
+# ─────────────────────────────────────────────────────────────────────────
+
+TECH_TOPIC_KEY_PREFIX = "tech:"
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _tech_topic_cluster_key(keyword: str) -> str:
+    """기술 토픽 키워드 → cluster_key.
+
+    `cluster_key` 컬럼이 String(40) 으로 짧으므로:
+    - 영숫자 외 문자는 `-` 로 정규화하고 32 자로 자른다.
+    - 정규화 결과가 너무 짧으면 sha1 hex 8자 fallback.
+    """
+    base = _SLUG_RE.sub("-", keyword.lower()).strip("-")
+    if len(base) < 3:
+        base = hashlib.sha1(keyword.encode("utf-8")).hexdigest()[:12]
+    base = base[:32]
+    return f"{TECH_TOPIC_KEY_PREFIX}{base}"
+
+
+def _build_tech_topic_summary(topic: "TechTopic") -> dict:
+    """TechTopic → cluster summary 와 호환되는 dict (LLM 프롬프트 입력)."""
+    sample_events: list[dict] = []
+    if topic.digest_title:
+        sample_events.append({
+            "title": topic.digest_title,
+            "severity": (topic.digest_priority or "info"),
+            "category": topic.digest_category or "tech_proposal",
+            "service_tag": None,
+        })
+    for art in topic.news_articles:
+        sample_events.append({
+            "title": art.get("title", ""),
+            "severity": "info",
+            "category": "tech_news",
+            "service_tag": art.get("source"),
+        })
+    return {
+        "keywords": [topic.keyword],
+        "event_count": (1 if topic.digest_title else 0) + len(topic.news_articles),
+        "first_seen": "—",
+        "last_seen": "—",
+        "sample_events": sample_events,
+        # Medium Digest 의 사전 분석을 LLM 프롬프트에 추가로 전달
+        "_extra_context": {
+            "digest_summary": topic.digest_summary,
+            "digest_target_scope": topic.digest_target_scope,
+            "digest_risks": topic.digest_risks,
+            "digest_difficulty": topic.digest_difficulty,
+            "digest_maturity": topic.digest_maturity,
+        },
+    }
+
+
+def _build_tech_topic_user_prompt(
+    summary: dict, hopenvision_context: list[dict],
+) -> str:
+    """tech 토픽 전용 프롬프트 — Medium Digest 의 사전 분석을 hint 로 함께 전달."""
+    parts = ["[수집된 기술 토픽]"]
+    parts.append(f"키워드: {', '.join(summary['keywords'])}")
+    parts.append(f"이벤트 수: {summary['event_count']}건")
+    parts.append("최근 이벤트 샘플:")
+    for ev in summary["sample_events"][:8]:
+        src = f", source={ev.get('service_tag')}" if ev.get('service_tag') else ""
+        parts.append(
+            f"  - [{ev.get('severity', '?')}] {ev.get('title', '')} "
+            f"(category={ev.get('category')}{src})"
+        )
+
+    extra = summary.get("_extra_context") or {}
+    if any(extra.values()):
+        parts.append("")
+        parts.append("[Medium Digest 사전 분석 hint]")
+        if extra.get("digest_summary"):
+            parts.append(f"  설명: {extra['digest_summary']}")
+        if extra.get("digest_target_scope"):
+            parts.append(f"  적용 대상(예시): {extra['digest_target_scope']}")
+        if extra.get("digest_risks"):
+            parts.append(f"  리스크(예시): {extra['digest_risks']}")
+        if extra.get("digest_difficulty"):
+            parts.append(f"  난이도: {extra['digest_difficulty']}")
+        if extra.get("digest_maturity"):
+            parts.append(f"  성숙도: {extra['digest_maturity']}")
+
+    parts.append("")
+    parts.append("[HopenVision 최근 30일 활동 (DB workitem)]")
+    if hopenvision_context:
+        for w in hopenvision_context[:15]:
+            parts.append(f"  - [{w['status']}/{w['category']}] {w['title']}")
+    else:
+        parts.append("  (최근 활동 없음)")
+
+    parts.append("")
+    parts.append(
+        "위 토픽이 HopenVision 에 어떻게 적용될 수 있을지 JSON 으로 제안하라. "
+        "Medium Digest hint 는 외부 사례 — HopenVision 코드베이스에 맞게 재해석할 것."
+    )
+    return "\n".join(parts)
+
+
+def _generate_proposal_for_tech_topic(
+    session: Session,
+    topic: "TechTopic",
+    hopenvision_ctx: list[dict],
+    *,
+    force: bool,
+) -> ProposalResult:
+    cluster_key = _tech_topic_cluster_key(topic.keyword)
+
+    if not force:
+        cached = session.scalars(
+            select(HopenVisionProposal)
+            .where(HopenVisionProposal.cluster_key == cluster_key,
+                   HopenVisionProposal.status.in_(("generated", "accepted")))
+            .order_by(HopenVisionProposal.created_at.desc())
+            .limit(1)
+        ).first()
+        if cached:
+            return ProposalResult(
+                proposal_id=str(cached.id),
+                cluster_key=cluster_key,
+                diagnosis=cached.diagnosis,
+                candidate_modules=cached.candidate_modules or [],
+                risks=cached.risks or [],
+                priority=cached.priority,
+                model=cached.model,
+                eval_ms=cached.eval_ms or 0,
+                status=cached.status,
+                raw_response=cached.raw_response,
+            )
+
+    summary = _build_tech_topic_summary(topic)
+    user_prompt = _build_tech_topic_user_prompt(summary, hopenvision_ctx)
+    model = settings.ollama_model_compose
+
+    gen = chat(
+        model=model,
+        system=_SYSTEM_PROMPT,
+        user=user_prompt,
+        temperature=0.2,
+        max_tokens=1500,
+    )
+    parsed = _parse_llm_json(gen.text) if gen.ok else None
+
+    proposal = HopenVisionProposal(
+        cluster_key=cluster_key,
+        model=model,
+        status="generated" if (gen.ok and parsed) else "failed",
+        cluster_keywords=[topic.keyword],
+        diagnosis=(parsed or {}).get("diagnosis") if parsed else None,
+        candidate_modules=(parsed or {}).get("candidate_modules", []) if parsed else [],
+        risks=(parsed or {}).get("risks", []) if parsed else [],
+        priority=(parsed or {}).get("priority") if parsed else None,
+        raw_response=gen.text,
+        eval_ms=gen.eval_duration_ms,
+    )
+    session.add(proposal)
+    session.flush()
+    session.commit()
+
+    return ProposalResult(
+        proposal_id=str(proposal.id),
+        cluster_key=cluster_key,
+        diagnosis=proposal.diagnosis,
+        candidate_modules=proposal.candidate_modules,
+        risks=proposal.risks,
+        priority=proposal.priority,
+        model=model,
+        eval_ms=gen.eval_duration_ms,
+        status=proposal.status,
+        raw_response=gen.text,
+    )
+
+
+def propose_from_tech_topics(
+    session: Session,
+    topics: list["TechTopic"],
+    *,
+    auto_dev_plan: bool = False,
+    force: bool = False,
+    max_topics: int = 5,
+) -> list[ProposalResult]:
+    """tech_trend 토픽 묶음 → HopenVision 제안 (+옵션상 DevPlan 초안화).
+
+    Args:
+        topics: SynthesisOutput.tech_topics — 키워드 단위로 그룹핑된 토픽
+        auto_dev_plan: True 면 generated 직후 `accept_as_dev_plan` 까지 호출 (DevPlan 초안 생성)
+        force: 캐시 무시하고 재생성
+        max_topics: 1회 호출당 처리할 최대 토픽 수 (LLM 호출 비용 한계)
+
+    Returns:
+        ProposalResult 리스트 (max_topics 만큼). 개별 토픽 실패는 흡수.
+    """
+    if not topics:
+        return []
+
+    try:
+        hopenvision_ctx = _fetch_hopenvision_context(session)
+    except Exception as e:  # noqa: BLE001 — work_items 테이블 없을 수도 있음
+        logger.warning("hopenvision context 조회 실패: %s", e)
+        hopenvision_ctx = []
+
+    results: list[ProposalResult] = []
+    for topic in topics[:max_topics]:
+        try:
+            result = _generate_proposal_for_tech_topic(
+                session, topic, hopenvision_ctx, force=force,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.error("tech topic 제안 실패 keyword=%s: %s",
+                         topic.keyword, e, exc_info=True)
+            continue
+
+        if (
+            auto_dev_plan
+            and result.status == "generated"
+            and result.candidate_modules
+        ):
+            try:
+                accept_as_dev_plan(session, result.proposal_id)
+                # 상태가 'accepted' 로 바뀌었으므로 result 도 동기화
+                result.status = "accepted"
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "tech topic DevPlan 자동 초안화 실패 keyword=%s proposal=%s: %s",
+                    topic.keyword, result.proposal_id, e,
+                )
+        results.append(result)
+    return results
+
+
+def list_tech_topic_proposals(
+    session: Session, *, limit: int = 10,
+) -> list[HopenVisionProposal]:
+    """대시보드용 — tech-trend 출처 제안 최근순."""
+    return list(session.scalars(
+        select(HopenVisionProposal)
+        .where(HopenVisionProposal.cluster_key.like(f"{TECH_TOPIC_KEY_PREFIX}%"))
+        .order_by(HopenVisionProposal.created_at.desc())
+        .limit(limit)
+    ))
