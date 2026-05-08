@@ -20,7 +20,8 @@ from ..core.config import settings
 from ..core.database import SessionLocal
 from ..models.insight import (
     COLLECTION_FIXES, COLLECTION_LOGS, COLLECTION_NEWSLETTERS, COLLECTION_QA,
-    IngestionEvent, SOURCE_LOGANALYZER,
+    COLLECTION_TECH, IngestionEvent, SOURCE_LOGANALYZER,
+    SOURCE_MEDIUM_DIGEST_REPORT, SOURCE_TECH_NEWS_ARTICLE,
 )
 from ..rag.retriever import retrieve, RetrievedChunk
 from .ollama_client import chat
@@ -34,6 +35,24 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class TechTopic:
+    """tech_trend 이벤트 그룹 — 키워드 단위로 디지스트 1건 + 관련 뉴스 N건."""
+
+    keyword: str
+    digest_title: str = ""
+    digest_priority: str = ""
+    digest_category: str = ""
+    digest_difficulty: str = ""
+    digest_maturity: str = ""
+    digest_summary: str = ""
+    digest_target_scope: str = ""
+    digest_risks: str = ""
+    digest_url: str = ""
+    digest_event_id: str = ""
+    news_articles: list[dict] = field(default_factory=list)
+
+
+@dataclass
 class SynthesisOutput:
     period_start: date
     period_end: date
@@ -44,6 +63,7 @@ class SynthesisOutput:
     summaries: list[str]
     source_event_ids: list[str]
     rag_refs: list[dict]
+    tech_topics: list[TechTopic] = field(default_factory=list)
     meta: dict = field(default_factory=dict)
 
 
@@ -191,11 +211,90 @@ def _stage2_analyze(summaries: list[str], kpis: dict) -> dict:
 
 
 def _retrieve_rag_context(session: Session, query: str) -> list[RetrievedChunk]:
-    """과거 뉴스레터 + fix 사례 검색."""
+    """과거 뉴스레터 + fix 사례 + 기술 토픽 코퍼스 검색."""
     refs: list[RetrievedChunk] = []
     refs.extend(retrieve(session, query, COLLECTION_NEWSLETTERS, top_k=3))
     refs.extend(retrieve(session, query, COLLECTION_FIXES, top_k=3))
+    refs.extend(retrieve(session, query, COLLECTION_TECH, top_k=3))
     return refs
+
+
+def _collect_tech_topics(events: list[IngestionEvent]) -> list[TechTopic]:
+    """tech_trend 이벤트(digest + news)를 키워드 단위로 그룹핑.
+
+    각 키워드(소문자 정규화)에 대해:
+    - 가장 최근 medium_digest_report 1건을 대표 디지스트로 선택
+    - 같은 키워드의 tech_news_article 들을 news_articles 로 매핑
+    """
+    digest_by_kw: dict[str, IngestionEvent] = {}
+    news_by_kw: dict[str, list[IngestionEvent]] = {}
+    display_by_kw: dict[str, str] = {}  # 정규화 키 → 화면 표시용 원문 케이스
+
+    for ev in events:
+        kw = (ev.canonical or {}).get("keyword") or ""
+        kw_norm = kw.strip().lower()
+        if not kw_norm:
+            continue
+        # 디지스트가 있으면 그쪽 케이스를 우선 사용. 없으면 처음 본 뉴스의 케이스.
+        if kw_norm not in display_by_kw or ev.source_type == SOURCE_MEDIUM_DIGEST_REPORT:
+            display_by_kw[kw_norm] = kw.strip()
+        if ev.source_type == SOURCE_MEDIUM_DIGEST_REPORT:
+            existing = digest_by_kw.get(kw_norm)
+            if existing is None or ev.occurred_at > existing.occurred_at:
+                digest_by_kw[kw_norm] = ev
+        elif ev.source_type == SOURCE_TECH_NEWS_ARTICLE:
+            news_by_kw.setdefault(kw_norm, []).append(ev)
+
+    if not digest_by_kw and not news_by_kw:
+        return []
+
+    # 키워드 union — 디지스트 우선 정렬, 다음으로 뉴스만 있는 키워드
+    all_kws = list(digest_by_kw.keys()) + [
+        k for k in news_by_kw.keys() if k not in digest_by_kw
+    ]
+    topics: list[TechTopic] = []
+    for kw in all_kws:
+        digest_ev = digest_by_kw.get(kw)
+        news_evs = news_by_kw.get(kw, [])
+        # 뉴스는 최신순 정렬, 키워드당 최대 5건만 노출
+        news_evs.sort(key=lambda e: e.occurred_at, reverse=True)
+        news_evs = news_evs[:5]
+
+        topic = TechTopic(keyword=display_by_kw.get(kw, kw))
+        if digest_ev is not None:
+            c = digest_ev.canonical or {}
+            topic.digest_title = digest_ev.title or ""
+            topic.digest_priority = c.get("priority", "")
+            topic.digest_category = c.get("category", "")
+            topic.digest_difficulty = c.get("difficulty", "")
+            topic.digest_maturity = c.get("maturity", "")
+            topic.digest_summary = (c.get("tech_description") or "")[:600]
+            topic.digest_target_scope = (c.get("target_scope") or "")[:600]
+            topic.digest_risks = (c.get("risks") or "")[:600]
+            topic.digest_url = digest_ev.source_url or ""
+            topic.digest_event_id = str(digest_ev.id)
+        for nev in news_evs:
+            nc = nev.canonical or {}
+            topic.news_articles.append({
+                "title": nev.title,
+                "url": nev.source_url or "",
+                "source": nc.get("source", ""),
+                "description": (nc.get("description") or "")[:240],
+                "published_at": (
+                    nev.occurred_at.isoformat()
+                    if nev.occurred_at else ""
+                ),
+            })
+        topics.append(topic)
+
+    # 우선순위 high/critical 을 먼저, 그 다음 디지스트 있는 것, 그 다음 뉴스 수
+    _PRIORITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "": 9}
+    topics.sort(key=lambda t: (
+        _PRIORITY_ORDER.get((t.digest_priority or "").lower(), 9),
+        0 if t.digest_title else 1,
+        -len(t.news_articles),
+    ))
+    return topics
 
 
 def _format_rag_block(refs: list[RetrievedChunk]) -> str:
@@ -347,6 +446,9 @@ def synthesize(
         )
         meta["stage3_ms"] = int((datetime.now() - t0).total_seconds() * 1000)
 
+        tech_topics = _collect_tech_topics(events)
+        meta["tech_topic_count"] = len(tech_topics)
+
         return SynthesisOutput(
             period_start=period_start,
             period_end=period_end,
@@ -364,6 +466,7 @@ def synthesize(
                 }
                 for r in rag_refs
             ],
+            tech_topics=tech_topics,
             meta=meta,
         )
     finally:

@@ -34,6 +34,21 @@
   .badge-high     { background: #fff8c5; color: #9a6700; }
   .badge-medium   { background: #ddf4ff; color: #0969da; }
   .badge-low      { background: #dafbe1; color: #1a7f37; }
+  .tech-section { margin-top: 28px; padding-top: 16px;
+                  border-top: 1px solid #e1e4e8; }
+  .tech-section > h2 { color: #ef4444; font-size: 18px; margin-bottom: 12px; }
+  .tech-topic { border: 1px solid #e1e4e8; border-radius: 6px; padding: 12px 16px;
+                margin-bottom: 12px; background: #fff; }
+  .tech-topic h3 { margin: 0; font-size: 15px; color: #1f2328; }
+  .tech-topic .kw { color: #ef4444; font-weight: 600; }
+  .tech-topic .meta-row { color: #57606a; font-size: 12px; margin: 4px 0 8px; }
+  .tech-topic .summary { font-size: 13px; color: #24292f; margin: 6px 0; }
+  .tech-topic .scope, .tech-topic .risk { font-size: 12px; color: #57606a;
+                                          margin-top: 4px; }
+  .tech-topic .label { font-weight: 600; color: #57606a; }
+  .tech-topic ul.news { padding-left: 18px; margin: 6px 0 0; }
+  .tech-topic ul.news li { font-size: 12.5px; color: #24292f; margin: 2px 0; }
+  .tech-topic .src-tag { color: #6e7781; font-size: 11px; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -50,6 +65,47 @@
   {% endif %}
 
   {{ body_html | safe }}
+
+  {% if tech_topics %}
+  <div class="tech-section">
+    <h2>이번 주 기술 토픽</h2>
+    {% for t in tech_topics %}
+    <div class="tech-topic">
+      <h3>
+        <span class="kw">{{ t.keyword }}</span>
+        {% if t.digest_title %}— {{ t.digest_title }}{% endif %}
+        {% if t.digest_priority %}<span class="badge badge-{{ t.digest_priority }}">{{ t.digest_priority }}</span>{% endif %}
+      </h3>
+      {% if t.digest_category or t.digest_difficulty or t.digest_maturity %}
+      <div class="meta-row">
+        {% if t.digest_category %}카테고리: {{ t.digest_category }}{% endif %}
+        {% if t.digest_difficulty %} · 난이도: {{ t.digest_difficulty }}{% endif %}
+        {% if t.digest_maturity %} · 성숙도: {{ t.digest_maturity }}{% endif %}
+      </div>
+      {% endif %}
+      {% if t.digest_summary %}
+      <div class="summary">{{ t.digest_summary }}</div>
+      {% endif %}
+      {% if t.digest_target_scope %}
+      <div class="scope"><span class="label">적용 대상:</span> {{ t.digest_target_scope }}</div>
+      {% endif %}
+      {% if t.digest_risks %}
+      <div class="risk"><span class="label">리스크:</span> {{ t.digest_risks }}</div>
+      {% endif %}
+      {% if t.news_articles %}
+      <ul class="news">
+        {% for a in t.news_articles %}
+        <li>
+          {% if a.url %}<a href="{{ a.url }}">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
+          {% if a.source %}<span class="src-tag">[{{ a.source }}]</span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <div class="footer">
     StandUp Insight · 주간 자동 발송 ·
