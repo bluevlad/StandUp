@@ -105,6 +105,14 @@ class Settings(BaseSettings):
     tech_news_workers: int = Field(default=4, env="TECH_NEWS_WORKERS")
     tech_news_timeout_sec: int = Field(default=15, env="TECH_NEWS_TIMEOUT_SEC")
 
+    # 주간 합성 직후 tech_topics 에 대해 HopenVision 제안 + DevPlan 자동 초안화
+    tech_trend_auto_dev_plan: bool = Field(
+        default=True, env="TECH_TREND_AUTO_DEV_PLAN",
+    )
+    tech_trend_max_topics_per_run: int = Field(
+        default=3, env="TECH_TREND_MAX_TOPICS_PER_RUN",
+    )
+
     # Naver News API (선택 — 미설정 시 Google News RSS 만 사용)
     naver_client_id: str = Field(default="", env="NAVER_CLIENT_ID")
     naver_client_secret: str = Field(default="", env="NAVER_CLIENT_SECRET")

@@ -12,7 +12,7 @@ Insight-Newsletter Agent — 주간 orchestrator.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
 
@@ -39,6 +39,7 @@ class WeeklyRunResult:
     newsletter_id: str
     send: SendSummary
     indexed_chunks: int
+    tech_topic_proposals: list = field(default_factory=list)
 
 
 def _last_week_window() -> tuple[date, date]:
@@ -112,6 +113,29 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
         send_result = send_newsletter(nl_to_send, dry_run=dry_run)
     logger.info("send 완료: %s", send_result)
 
+    # 6. tech_topics → HopenVision 제안 (+ DevPlan 자동 초안화)
+    #    LLM 호출이라 발송 이후로 미루고, 실패해도 주간 흐름은 막지 않는다.
+    tech_proposals: list = []
+    if syn.tech_topics:
+        try:
+            from ..services.hopenvision_proposal_service import (
+                propose_from_tech_topics,
+            )
+            with SessionLocal() as session:
+                tech_proposals = propose_from_tech_topics(
+                    session,
+                    syn.tech_topics,
+                    auto_dev_plan=settings.tech_trend_auto_dev_plan,
+                    max_topics=settings.tech_trend_max_topics_per_run,
+                )
+            logger.info(
+                "tech_topic 제안 %d건 생성 (auto_dev_plan=%s)",
+                len(tech_proposals), settings.tech_trend_auto_dev_plan,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("tech_topic 제안 실패 (파이프라인은 계속): %s", e,
+                           exc_info=True)
+
     logger.info("=== Insight Weekly 종료 ===")
     return WeeklyRunResult(
         period_start=period_start,
@@ -121,6 +145,7 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
         newsletter_id=nl_id,
         send=send_result,
         indexed_chunks=indexed,
+        tech_topic_proposals=tech_proposals,
     )
 
 

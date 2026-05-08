@@ -114,6 +114,49 @@ LLM 호출 실패 시: synthesis 가 raw 데이터로 fallback 본문 생성 →
 
 `synthesis_meta.stage{1,2,3}_ms` 로 단계별 시간 측정 가능. 합성 한 번에 보통 30~120초 (M5 24GB 기준).
 
+## tech_trend 채널 (PR1~3) — Medium Digest + 외부 뉴스 → HopenVision 자동 제안
+
+기존 3 source(loganalyzer/github_qa/auto_tobe) 외에 **외부 기술 동향**을 같은 hub 로
+흡수하는 채널이 추가되었다.
+
+```
+[medium-digest-agent reports/*.md] ─┐
+                                     ├─→ TechTrendConnector ─→ corpus_tech
+[Google News RSS / Naver News API] ─┘                                │
+                                                                    ↓
+                                                  Synthesis (변경 없음)
+                                                                    ↓
+                                  SynthesisOutput.tech_topics (키워드별 묶음)
+                                              ↓                     ↓
+                            Newsletter '이번 주 기술 토픽' 섹션      ↓
+                                                                    ↓
+                            HopenVisionProposalService.propose_from_tech_topics()
+                                              ↓
+                            HopenVisionProposal (cluster_key='tech:<slug>')
+                                              ↓
+                                  TECH_TREND_AUTO_DEV_PLAN=true 면
+                                              ↓
+                                          DevPlan(DRAFT) 자동 초안화
+```
+
+핵심 환경변수:
+
+| Key | 기본값 | 설명 |
+|-----|-------|------|
+| `TECH_TREND_ENABLED` | `false` | connector 활성화 |
+| `TECH_TREND_KEYWORDS` | `java,spring,react` | 콤마 구분 검색·필터 키워드 |
+| `MEDIUM_DIGEST_REPORTS_DIR` | `""` | medium-digest-agent 가 만든 `reports/*.md` 경로 |
+| `TECH_NEWS_MAX_PER_KEYWORD` | `5` | 키워드당 뉴스 검색 결과 상한 |
+| `NAVER_CLIENT_ID/SECRET` | `""` | 미설정 시 Google News RSS 만 사용 |
+| `TECH_TREND_AUTO_DEV_PLAN` | `true` | 합성 후 즉시 DevPlan 초안화 |
+| `TECH_TREND_MAX_TOPICS_PER_RUN` | `3` | 1회 합성당 LLM 호출 최대 토픽 수 |
+
+운영 메모:
+- **Gmail 수신은 medium-digest-agent 가 전담** — StandUp 은 산출 markdown 만 import
+- 외부 뉴스 검색은 AllergyInsight 와 동일하게 RSS 기반 (별도 유료 키 불필요)
+- HopenVision 제안 캐시는 `cluster_key=tech:<slug>` 로 클러스터 기반 제안과 분리
+- 대시보드 `/dashboard/insights` 의 ④번 섹션에서 자동 생성된 제안 + DevPlan 링크 확인
+
 ## 향후 확장
 
 1. **자동 효과 검증** (`docs/AGENT_DATA_CONTRACT.md` 참고) — fix 후 재발 여부 자동 라벨
