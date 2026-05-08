@@ -122,9 +122,12 @@ COLLECTION_QA = "corpus_qa"
 COLLECTION_LOGS = "corpus_logs"
 COLLECTION_FIXES = "corpus_fixes"
 COLLECTION_NEWSLETTERS = "corpus_newsletters"
+COLLECTION_TECH = "corpus_tech"
 
 # Source type 상수
 SOURCE_LOGANALYZER = "loganalyzer"
 SOURCE_GITHUB_QA = "github_qa"
 SOURCE_AUTO_TOBE_JOURNAL = "auto_tobe_journal"
 SOURCE_AUTO_TOBE_COMMIT = "auto_tobe_commit"
+SOURCE_MEDIUM_DIGEST_REPORT = "medium_digest_report"
+SOURCE_TECH_NEWS_ARTICLE = "tech_news_article"
