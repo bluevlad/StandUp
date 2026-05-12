@@ -104,11 +104,14 @@ class GoogleNewsRSS:
         try:
             # feedparser 는 자체 fetch 도 가능하나 timeout 제어가 까다로워
             # requests 로 받아 string 을 파싱한다.
-            resp = requests.get(
-                url,
-                timeout=timeout,
-                headers={"User-Agent": "StandUp-TechTrend/1.0"},
-            )
+            # trust_env=False — OrbStack 자동 주입 proxy 가 IPv6 resolve 깨짐 회피.
+            with requests.Session() as sess:
+                sess.trust_env = False
+                resp = sess.get(
+                    url,
+                    timeout=timeout,
+                    headers={"User-Agent": "StandUp-TechTrend/1.0"},
+                )
             resp.raise_for_status()
             feed = feedparser.parse(resp.text)
         except Exception as e:  # noqa: BLE001 — 외부 장애 흡수
@@ -140,6 +143,9 @@ class NaverNewsAPI:
         self.client_id = client_id
         self.client_secret = client_secret
         self._session = requests.Session()
+        # OrbStack 자동 주입 proxy 우회 — Naver API 호출은 외부 인터넷이지만
+        # 컨테이너의 HTTPS_PROXY 가 IPv6 깨짐을 유발하므로 직접 호출.
+        self._session.trust_env = False
         self._session.headers.update({
             "X-Naver-Client-Id": client_id,
             "X-Naver-Client-Secret": client_secret,
