@@ -136,8 +136,9 @@ def _fake_chat_result(text: str, ok: bool = True):
 
 
 # ── 기존 (PR3) 테스트들 — fitness 게이트는 _GATE_OFF 로 비활성화해서 본래 의도만 검증
-# PR4 게이트 동작은 별도 테스트(test_propose_*_gate_*) 에서 검증
-_GATE_OFF = {"fitness_threshold": 0, "use_llm_fitness": False}
+# PR4 게이트 동작은 별도 테스트(test_propose_*_gate_*) 에서, PR5 detailer 동작은
+# tests/test_tech_brief_detailer.py 에서 검증. 기존 흐름 테스트에는 detail 도 끈다.
+_GATE_OFF = {"fitness_threshold": 0, "use_llm_fitness": False, "enable_detail": False}
 
 
 def test_propose_from_tech_topics_skips_when_empty():
@@ -336,6 +337,13 @@ def test_propose_filters_out_below_threshold():
         "app.services.hopenvision_proposal_service.evaluate_topic",
         side_effect=fake_eval,
     ), patch(
+        "app.services.hopenvision_proposal_service.detail_topic",
+        return_value=MagicMock(
+            to_storage_dict=lambda: {
+                "diagram_mermaid": "", "case_studies": [], "code_hints": [],
+            },
+        ),
+    ), patch(
         "app.services.hopenvision_proposal_service.chat",
         return_value=_fake_chat_result(fake_response),
     ) as chat_mock:
@@ -343,7 +351,7 @@ def test_propose_filters_out_below_threshold():
             session, topics, auto_dev_plan=False, fitness_threshold=60,
         )
 
-    # Java 만 LLM 호출
+    # Java 만 LLM 호출 (proposal 단계 1회)
     assert chat_mock.call_count == 1
     # 결과는 2개 모두 반환되지만 상태가 다름
     statuses = [r.status for r in results]
@@ -370,6 +378,14 @@ def test_propose_persists_fitness_fields_on_generated():
     )
     fake_response = '{"diagnosis":"d","candidate_modules":[{"module":"M","effort":"M"}],"risks":[],"priority":"P1"}'
 
+    detail_mock = MagicMock(
+        to_storage_dict=lambda: {
+            "diagram_mermaid": "flowchart LR\nA-->B",
+            "case_studies": [{"title": "c", "url": "https://x", "image_url": ""}],
+            "code_hints": [{"file": "api/X.java", "change_sketch": "s", "snippet": ""}],
+        },
+    )
+
     with patch(
         "app.services.hopenvision_proposal_service._fetch_hopenvision_context",
         return_value=[],
@@ -379,6 +395,9 @@ def test_propose_persists_fitness_fields_on_generated():
     ), patch(
         "app.services.hopenvision_proposal_service.evaluate_topic",
         return_value=fit,
+    ), patch(
+        "app.services.hopenvision_proposal_service.detail_topic",
+        return_value=detail_mock,
     ), patch(
         "app.services.hopenvision_proposal_service.chat",
         return_value=_fake_chat_result(fake_response),
@@ -394,3 +413,7 @@ def test_propose_persists_fitness_fields_on_generated():
     assert r.impact_area == "backend-api"
     assert r.effort_hours == 12
     assert r.fitness_reason == "컨트롤러 매핑"
+    # PR5 — detailer 산출물도 result 에 반영
+    assert "flowchart" in r.diagram_mermaid
+    assert len(r.case_studies) == 1
+    assert r.code_hints[0]["file"] == "api/X.java"

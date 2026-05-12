@@ -121,6 +121,11 @@ class HopenVisionProposal(Base):
     impact_area = Column(String(40), nullable=True)  # backend-api|frontend-admin|...
     effort_hours = Column(Integer, nullable=True)
 
+    # PR5 — 상세 산출물 (detailer 결과, tech-trend 통과 토픽일 때만 채워짐)
+    diagram_mermaid = Column(Text, nullable=True)  # Mermaid 코드
+    case_studies = Column(JSONB, nullable=False, default=list, server_default="[]")
+    code_hints = Column(JSONB, nullable=False, default=list, server_default="[]")
+
 
 # Collection 상수
 COLLECTION_QA = "corpus_qa"

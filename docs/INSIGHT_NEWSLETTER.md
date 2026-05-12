@@ -198,6 +198,30 @@ candidate_modules 를 제안하게 한다.
   — 대시보드에서 "참고 보관" 탭 / 제안 정렬에 활용 (PR5 에서 UI 노출).
 - 게이트를 끄려면 `HOPEN_BRIEF_FITNESS_THRESHOLD=0` 으로 설정 (PR3 동작 복원).
 
+## 상세 산출물 (PR5) — Mermaid · 적용 사례 · PoC 코드 힌트
+
+PR4 의 적합도 게이트를 통과한 토픽에 대해 *카드형 메일 한 토픽 = 한 페이지* 수준의
+상세 산출물을 추가로 생성한다. 모든 결과는 `hopenvision_proposals` 행에 함께 저장.
+
+`app/synthesis/tech_brief_detailer.py` 가 세 단계를 묶어 호출:
+
+| 단계 | 산출물 | 모델/외부 호출 |
+|------|--------|----------------|
+| 1) Mermaid 다이어그램 | `diagram_mermaid` (As-Is / To-Be subgraph 형식) | `OLLAMA_MODEL_ANALYZE` |
+| 2) 적용 사례 | `case_studies` (`title/url/image_url/description/site_name/source`) | 뉴스 article URL 에서 og:image / canonical 추출 (`article_image_extractor`) |
+| 3) PoC 코드 힌트 | `code_hints` (`file/change_sketch/snippet`) | `OLLAMA_MODEL_ANALYZE` — repo index 파일 경로 외 항목은 ⚠ 표시 |
+
+각 단계는 독립 try/except — 한 단계가 실패해도 다른 산출물은 정상 저장된다.
+`enable_detail=False` 로 호출하면 detailer 자체를 skip (테스트·디버그용).
+
+새 메일 템플릿 `app/templates/hopen_tech_brief.html` 가 토픽 1~3 건을 카드로 표현:
+- 적합도 / 예상공수 배지, priority / impact_area 배지
+- Mermaid 코드블록 + `mermaid.live` 링크 (Gmail 에서 직접 렌더는 미지원, 코드 복붙으로 시각화)
+- 사례 카드 (썸네일 + 제목 + 사이트명 + 짧은 설명)
+- 코드 힌트 (실파일 경로 + 변경 스케치 + 옵션 snippet)
+
+PR6 에서 일일 cron 으로 이 템플릿을 호출하는 별도 `[HopenTechBrief]` 메일 채널 추가 예정.
+
 ## 향후 확장
 
 1. **자동 효과 검증** (`docs/AGENT_DATA_CONTRACT.md` 참고) — fix 후 재발 여부 자동 라벨
