@@ -115,6 +115,9 @@ def extract_article_meta(
         return ArticleMeta(url=url or "", error="invalid url")
 
     sess = session or requests.Session()
+    if session is None:
+        # 신규 세션이면 OrbStack 자동 주입 proxy 우회 — IPv6 resolve 깨짐 회피.
+        sess.trust_env = False
     try:
         resp = sess.get(
             url,
@@ -162,6 +165,7 @@ def extract_many(
     if not urls:
         return out
     with requests.Session() as sess:
+        sess.trust_env = False  # 호스트 proxy 자동 주입 우회
         for url in urls[:limit]:
             out.append(extract_article_meta(url, timeout=timeout, session=sess))
     return out
