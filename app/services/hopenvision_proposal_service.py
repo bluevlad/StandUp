@@ -32,6 +32,8 @@ from ..models.dev_plan import (
 from ..models.insight import HopenVisionProposal
 from ..models.issue import WorkItem
 from ..synthesis.ollama_client import chat
+from .hopenvision_repo_indexer import condense_for_prompt, index_hopenvision_repo
+from .tech_topic_filter import FitnessResult, evaluate_topic
 from .topic_cluster_service import get_topic_clusters
 
 if TYPE_CHECKING:
@@ -76,8 +78,13 @@ class ProposalResult:
     priority: Optional[str]
     model: str
     eval_ms: int
-    status: str  # generated|failed
+    status: str  # generated|failed|filtered_out
     raw_response: Optional[str]
+    # PR4 — HopenVision 적합도 평가 결과
+    fitness_score: Optional[int] = None
+    impact_area: Optional[str] = None
+    effort_hours: Optional[int] = None
+    fitness_reason: Optional[str] = None
 
 
 def _build_user_prompt(cluster_summary: dict, hopenvision_context: list[dict]) -> str:
@@ -374,9 +381,13 @@ def _build_tech_topic_summary(topic: "TechTopic") -> dict:
 
 
 def _build_tech_topic_user_prompt(
-    summary: dict, hopenvision_context: list[dict],
+    summary: dict,
+    hopenvision_context: list[dict],
+    *,
+    repo_index: Optional[dict] = None,
+    fitness: Optional[FitnessResult] = None,
 ) -> str:
-    """tech 토픽 전용 프롬프트 — Medium Digest 의 사전 분석을 hint 로 함께 전달."""
+    """tech 토픽 전용 프롬프트 — Medium Digest hint + (PR4) repo index + fitness 결과."""
     parts = ["[수집된 기술 토픽]"]
     parts.append(f"키워드: {', '.join(summary['keywords'])}")
     parts.append(f"이벤트 수: {summary['event_count']}건")
@@ -403,6 +414,22 @@ def _build_tech_topic_user_prompt(
         if extra.get("digest_maturity"):
             parts.append(f"  성숙도: {extra['digest_maturity']}")
 
+    # PR4 — HopenVision repo index 를 LLM 에 직접 노출
+    if repo_index and repo_index.get("summary"):
+        parts.append("")
+        parts.append(condense_for_prompt(repo_index))
+
+    if fitness is not None:
+        parts.append("")
+        parts.append(
+            f"[사전 적합도 평가] score={fitness.score}/100 "
+            f"(stack={fitness.stack_score} llm={fitness.llm_score}), "
+            f"impact_area={fitness.impact_area}, effort_hours={fitness.effort_hours}, "
+            f"matched_tags={','.join(fitness.matched_stack_tags) or '-'}"
+        )
+        if fitness.reason:
+            parts.append(f"  reason: {fitness.reason}")
+
     parts.append("")
     parts.append("[HopenVision 최근 30일 활동 (DB workitem)]")
     if hopenvision_context:
@@ -414,7 +441,8 @@ def _build_tech_topic_user_prompt(
     parts.append("")
     parts.append(
         "위 토픽이 HopenVision 에 어떻게 적용될 수 있을지 JSON 으로 제안하라. "
-        "Medium Digest hint 는 외부 사례 — HopenVision 코드베이스에 맞게 재해석할 것."
+        "Medium Digest hint 는 외부 사례 — HopenVision 코드베이스(repo index)에 명시된 "
+        "모듈·엔티티·페이지로 candidate_modules 를 매핑할 것."
     )
     return "\n".join(parts)
 
@@ -425,6 +453,8 @@ def _generate_proposal_for_tech_topic(
     hopenvision_ctx: list[dict],
     *,
     force: bool,
+    repo_index: Optional[dict] = None,
+    fitness: Optional[FitnessResult] = None,
 ) -> ProposalResult:
     cluster_key = _tech_topic_cluster_key(topic.keyword)
 
@@ -448,10 +478,15 @@ def _generate_proposal_for_tech_topic(
                 eval_ms=cached.eval_ms or 0,
                 status=cached.status,
                 raw_response=cached.raw_response,
+                fitness_score=cached.fitness_score,
+                impact_area=cached.impact_area,
+                effort_hours=cached.effort_hours,
             )
 
     summary = _build_tech_topic_summary(topic)
-    user_prompt = _build_tech_topic_user_prompt(summary, hopenvision_ctx)
+    user_prompt = _build_tech_topic_user_prompt(
+        summary, hopenvision_ctx, repo_index=repo_index, fitness=fitness,
+    )
     model = settings.ollama_model_compose
 
     gen = chat(
@@ -474,6 +509,9 @@ def _generate_proposal_for_tech_topic(
         priority=(parsed or {}).get("priority") if parsed else None,
         raw_response=gen.text,
         eval_ms=gen.eval_duration_ms,
+        fitness_score=fitness.score if fitness else None,
+        impact_area=fitness.impact_area if fitness else None,
+        effort_hours=fitness.effort_hours if fitness else None,
     )
     session.add(proposal)
     session.flush()
@@ -490,6 +528,10 @@ def _generate_proposal_for_tech_topic(
         eval_ms=gen.eval_duration_ms,
         status=proposal.status,
         raw_response=gen.text,
+        fitness_score=proposal.fitness_score,
+        impact_area=proposal.impact_area,
+        effort_hours=proposal.effort_hours,
+        fitness_reason=fitness.reason if fitness else None,
     )
 
 
@@ -500,20 +542,34 @@ def propose_from_tech_topics(
     auto_dev_plan: bool = False,
     force: bool = False,
     max_topics: int = 5,
+    fitness_threshold: Optional[int] = None,
+    use_llm_fitness: bool = True,
 ) -> list[ProposalResult]:
     """tech_trend 토픽 묶음 → HopenVision 제안 (+옵션상 DevPlan 초안화).
 
+    PR4 변경 — 토픽별로 HopenVision 적합도(`evaluate_topic`)를 먼저 계산해
+    threshold 미달 토픽은 LLM 호출 없이 `filtered_out` ProposalResult 로 표시 (DB 저장 X).
+    통과 토픽만 LLM 으로 제안 생성, fitness_score/impact_area/effort_hours 를
+    `hopenvision_proposals` 행에 함께 저장.
+
     Args:
         topics: SynthesisOutput.tech_topics — 키워드 단위로 그룹핑된 토픽
-        auto_dev_plan: True 면 generated 직후 `accept_as_dev_plan` 까지 호출 (DevPlan 초안 생성)
+        auto_dev_plan: True 면 generated 직후 `accept_as_dev_plan` 까지 호출
         force: 캐시 무시하고 재생성
-        max_topics: 1회 호출당 처리할 최대 토픽 수 (LLM 호출 비용 한계)
+        max_topics: 1회 호출당 처리할 최대 토픽 수
+        fitness_threshold: None 이면 `settings.hopen_brief_fitness_threshold`
+        use_llm_fitness: False 면 스택 매칭만 사용 (LLM 호출 절약, 테스트 친화)
 
     Returns:
-        ProposalResult 리스트 (max_topics 만큼). 개별 토픽 실패는 흡수.
+        ProposalResult 리스트 — filtered_out 도 포함되므로 호출측에서 status 로 분기.
     """
     if not topics:
         return []
+
+    threshold = (
+        fitness_threshold if fitness_threshold is not None
+        else settings.hopen_brief_fitness_threshold
+    )
 
     try:
         hopenvision_ctx = _fetch_hopenvision_context(session)
@@ -521,11 +577,58 @@ def propose_from_tech_topics(
         logger.warning("hopenvision context 조회 실패: %s", e)
         hopenvision_ctx = []
 
+    # repo index 는 토픽 전체에서 공유 — 1회만 로드
+    try:
+        repo_index = index_hopenvision_repo()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("hopenvision repo index 로드 실패: %s", e)
+        repo_index = {}
+
     results: list[ProposalResult] = []
     for topic in topics[:max_topics]:
+        # 1) 적합도 평가 (게이팅)
+        try:
+            fitness = evaluate_topic(
+                topic, repo_index,
+                use_llm=use_llm_fitness,
+                threshold=threshold,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "fitness 평가 실패 keyword=%s: %s — 보수적으로 통과 처리",
+                topic.keyword, e,
+            )
+            fitness = None
+
+        if fitness is not None and not fitness.eligible:
+            logger.info(
+                "tech topic filtered_out keyword=%s score=%d (threshold=%d) reason=%s",
+                topic.keyword, fitness.score, threshold,
+                (fitness.reason or "stack-low")[:80],
+            )
+            results.append(ProposalResult(
+                proposal_id="",
+                cluster_key=_tech_topic_cluster_key(topic.keyword),
+                diagnosis=None,
+                candidate_modules=[],
+                risks=[],
+                priority=None,
+                model="",
+                eval_ms=fitness.eval_ms,
+                status="filtered_out",
+                raw_response=None,
+                fitness_score=fitness.score,
+                impact_area=fitness.impact_area,
+                effort_hours=fitness.effort_hours,
+                fitness_reason=fitness.reason,
+            ))
+            continue
+
+        # 2) 통과 토픽만 LLM 제안 생성
         try:
             result = _generate_proposal_for_tech_topic(
-                session, topic, hopenvision_ctx, force=force,
+                session, topic, hopenvision_ctx,
+                force=force, repo_index=repo_index, fitness=fitness,
             )
         except Exception as e:  # noqa: BLE001
             logger.error("tech topic 제안 실패 keyword=%s: %s",

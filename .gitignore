@@ -39,6 +39,9 @@ nul
 logs/
 *.log
 
+# Runtime caches (e.g. hopenvision repo index)
+.cache/
+
 # Alembic
 alembic/versions/*.pyc
 

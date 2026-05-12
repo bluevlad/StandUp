@@ -157,6 +157,47 @@ LLM 호출 실패 시: synthesis 가 raw 데이터로 fallback 본문 생성 →
 - HopenVision 제안 캐시는 `cluster_key=tech:<slug>` 로 클러스터 기반 제안과 분리
 - 대시보드 `/dashboard/insights` 의 ④번 섹션에서 자동 생성된 제안 + DevPlan 링크 확인
 
+## HopenVision-Tight 게이트 (PR4)
+
+PR3 까지는 `tech_trend_keywords` 매칭만 통과하면 모든 토픽이 LLM 제안 → DevPlan 초안화
+경로를 탔다. 이 때문에 Autonomous-QA-Agent / Unity / 머신비전 같이 HopenVision 과
+무관한 토픽도 제안 큐에 올라와 범위가 너무 확장되었다.
+
+PR4 부터는 토픽 → 제안 사이에 **HopenVision 적합도 게이트**가 추가된다.
+
+```
+TechTopic (키워드+디지스트+뉴스)
+   ↓ stack 키워드 매칭 (0~60점, 결정적)
+   ↓ LLM 분류 (0~40점, 모델=qwen2.5-coder)
+   ↓ score >= HOPEN_BRIEF_FITNESS_THRESHOLD ?
+   ├─ Yes → HopenVisionProposalService 로 진입, repo index 와 fitness 결과를
+   │         프롬프트에 동봉. proposal 행에 fitness_score/impact_area/effort_hours 저장.
+   └─ No  → filtered_out 으로 표시 (DB 저장 X, 로그에만 남김)
+```
+
+핵심 입력은 **로컬 hopenvision clone** 의 트리 인덱스:
+- Spring `@RestController` / `@Entity` / `@Service` 클래스 + 패키지 + 라우트
+- `web-admin/web-user/web-shared` 의 페이지 컴포넌트 목록
+
+인덱스는 `BASE_DIR/.cache/hopenvision_repo_index.json` 에 24h TTL 로 캐시.
+LLM 프롬프트에 `condense_for_prompt(idx)` 결과가 들어가 모델이 *실제 모듈명* 으로
+candidate_modules 를 제안하게 한다.
+
+| Key | 기본값 | 설명 |
+|-----|-------|------|
+| `HOPENVISION_REPO_PATH` | `""` | HopenVision 로컬 clone 경로 (미설정 시 게이트는 stack 매칭만으로 동작) |
+| `HOPENVISION_STACK_TAGS` | `java,spring,spring-boot,react,postgresql,typescript,jpa,jwt,docker` | 토픽 텍스트와 매칭할 스택 태그 |
+| `HOPEN_BRIEF_FITNESS_THRESHOLD` | `60` | 0~100. 미달 토픽은 LLM 제안 생성 skip |
+| `HOPEN_REPO_INDEX_TTL_HOURS` | `24` | repo index 캐시 TTL |
+
+운영 메모:
+- 1회 실행에 LLM 호출이 (토픽당 게이트 1회 + 제안 1회) 발생 — 게이트 모델은
+  `OLLAMA_MODEL_ANALYZE` (기본 qwen2.5-coder:14b), 제안 모델은 `OLLAMA_MODEL_COMPOSE`.
+  스택 매칭이 0 인 토픽은 게이트 LLM 호출도 skip 되므로 비용 가드.
+- `HopenVisionProposal.fitness_score / impact_area / effort_hours` 컬럼이 추가됨
+  — 대시보드에서 "참고 보관" 탭 / 제안 정렬에 활용 (PR5 에서 UI 노출).
+- 게이트를 끄려면 `HOPEN_BRIEF_FITNESS_THRESHOLD=0` 으로 설정 (PR3 동작 복원).
+
 ## 향후 확장
 
 1. **자동 효과 검증** (`docs/AGENT_DATA_CONTRACT.md` 참고) — fix 후 재발 여부 자동 라벨

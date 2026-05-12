@@ -116,6 +116,11 @@ class HopenVisionProposal(Base):
     dev_plan_id = Column(Integer, ForeignKey("dev_plans.id", ondelete="SET NULL"),
                          nullable=True, index=True)
 
+    # PR4 — HopenVision 적합도 (tech-trend 출처일 때만 채워짐)
+    fitness_score = Column(Integer, nullable=True, index=True)  # 0~100
+    impact_area = Column(String(40), nullable=True)  # backend-api|frontend-admin|...
+    effort_hours = Column(Integer, nullable=True)
+
 
 # Collection 상수
 COLLECTION_QA = "corpus_qa"

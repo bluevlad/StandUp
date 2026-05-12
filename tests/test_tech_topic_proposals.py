@@ -135,9 +135,14 @@ def _fake_chat_result(text: str, ok: bool = True):
     return res
 
 
+# ── 기존 (PR3) 테스트들 — fitness 게이트는 _GATE_OFF 로 비활성화해서 본래 의도만 검증
+# PR4 게이트 동작은 별도 테스트(test_propose_*_gate_*) 에서 검증
+_GATE_OFF = {"fitness_threshold": 0, "use_llm_fitness": False}
+
+
 def test_propose_from_tech_topics_skips_when_empty():
     session = MagicMock()
-    out = propose_from_tech_topics(session, [], auto_dev_plan=False)
+    out = propose_from_tech_topics(session, [], auto_dev_plan=False, **_GATE_OFF)
     assert out == []
     session.add.assert_not_called()
 
@@ -161,7 +166,7 @@ def test_propose_from_tech_topics_generates_per_topic():
         return_value=_fake_chat_result(fake_response),
     ):
         results = propose_from_tech_topics(
-            session, topics, auto_dev_plan=False, max_topics=5,
+            session, topics, auto_dev_plan=False, max_topics=5, **_GATE_OFF,
         )
 
     assert len(results) == 2
@@ -188,7 +193,7 @@ def test_propose_from_tech_topics_respects_max_topics():
         return_value=_fake_chat_result(fake_response),
     ):
         results = propose_from_tech_topics(
-            session, topics, auto_dev_plan=False, max_topics=2,
+            session, topics, auto_dev_plan=False, max_topics=2, **_GATE_OFF,
         )
 
     assert len(results) == 2
@@ -207,6 +212,9 @@ def test_propose_from_tech_topics_uses_cache_when_not_force():
     cached.eval_ms = 50
     cached.status = "generated"
     cached.raw_response = "raw"
+    cached.fitness_score = 80
+    cached.impact_area = "backend-api"
+    cached.effort_hours = 6
     session.scalars.return_value.first.return_value = cached
 
     with patch(
@@ -216,7 +224,7 @@ def test_propose_from_tech_topics_uses_cache_when_not_force():
         "app.services.hopenvision_proposal_service.chat",
     ) as chat_mock:
         results = propose_from_tech_topics(
-            session, topics, auto_dev_plan=False, force=False,
+            session, topics, auto_dev_plan=False, force=False, **_GATE_OFF,
         )
 
     chat_mock.assert_not_called()
@@ -242,7 +250,7 @@ def test_propose_from_tech_topics_auto_dev_plan_invokes_acceptor():
         "app.services.hopenvision_proposal_service.accept_as_dev_plan",
     ) as accept_mock:
         results = propose_from_tech_topics(
-            session, topics, auto_dev_plan=True,
+            session, topics, auto_dev_plan=True, **_GATE_OFF,
         )
 
     assert accept_mock.call_count == 1
@@ -265,7 +273,7 @@ def test_propose_from_tech_topics_skips_dev_plan_when_no_modules():
     ), patch(
         "app.services.hopenvision_proposal_service.accept_as_dev_plan",
     ) as accept_mock:
-        propose_from_tech_topics(session, topics, auto_dev_plan=True)
+        propose_from_tech_topics(session, topics, auto_dev_plan=True, **_GATE_OFF)
 
     accept_mock.assert_not_called()
 
@@ -286,8 +294,103 @@ def test_propose_from_tech_topics_handles_llm_failure():
         "app.services.hopenvision_proposal_service.accept_as_dev_plan",
     ) as accept_mock:
         results = propose_from_tech_topics(
-            session, topics, auto_dev_plan=True,
+            session, topics, auto_dev_plan=True, **_GATE_OFF,
         )
 
     assert results[0].status == "failed"
     accept_mock.assert_not_called()
+
+
+# ── PR4: HopenVision 적합도 게이트 ────────────────────────────────────────
+
+def test_propose_filters_out_below_threshold():
+    """fitness_score < threshold 면 LLM 호출 없이 filtered_out 으로 반환."""
+    topics = [TechTopic(keyword="Java"), TechTopic(keyword="Unity Engine")]
+    session = MagicMock()
+
+    from app.services.tech_topic_filter import FitnessResult
+
+    def fake_eval(topic, repo_index, **kw):
+        if topic.keyword == "Java":
+            return FitnessResult(
+                score=80, eligible=True, matched_stack_tags=["java"],
+                impact_area="backend-api", effort_hours=4, reason="ok",
+                stack_score=40, llm_score=40, model="m", eval_ms=10,
+            )
+        return FitnessResult(
+            score=10, eligible=False, matched_stack_tags=[],
+            impact_area="unknown", effort_hours=None, reason="무관",
+            stack_score=10, llm_score=0, model="m", eval_ms=5,
+        )
+
+    session.scalars.return_value.first.return_value = None
+    fake_response = '{"diagnosis":"d","candidate_modules":[],"risks":[],"priority":"P3"}'
+
+    with patch(
+        "app.services.hopenvision_proposal_service._fetch_hopenvision_context",
+        return_value=[],
+    ), patch(
+        "app.services.hopenvision_proposal_service.index_hopenvision_repo",
+        return_value={"summary": {}},
+    ), patch(
+        "app.services.hopenvision_proposal_service.evaluate_topic",
+        side_effect=fake_eval,
+    ), patch(
+        "app.services.hopenvision_proposal_service.chat",
+        return_value=_fake_chat_result(fake_response),
+    ) as chat_mock:
+        results = propose_from_tech_topics(
+            session, topics, auto_dev_plan=False, fitness_threshold=60,
+        )
+
+    # Java 만 LLM 호출
+    assert chat_mock.call_count == 1
+    # 결과는 2개 모두 반환되지만 상태가 다름
+    statuses = [r.status for r in results]
+    assert "filtered_out" in statuses
+    assert "generated" in statuses
+    filtered = next(r for r in results if r.status == "filtered_out")
+    assert filtered.fitness_score == 10
+    assert filtered.impact_area == "unknown"
+    assert filtered.proposal_id == ""  # DB 저장 안 됨
+
+
+def test_propose_persists_fitness_fields_on_generated():
+    """통과 토픽은 ProposalResult.fitness_* 가 채워져야 함."""
+    topics = [TechTopic(keyword="Spring Boot")]
+    session = MagicMock()
+    session.scalars.return_value.first.return_value = None
+
+    from app.services.tech_topic_filter import FitnessResult
+
+    fit = FitnessResult(
+        score=75, eligible=True, matched_stack_tags=["spring-boot"],
+        impact_area="backend-api", effort_hours=12, reason="컨트롤러 매핑",
+        stack_score=25, llm_score=50, model="m", eval_ms=20,
+    )
+    fake_response = '{"diagnosis":"d","candidate_modules":[{"module":"M","effort":"M"}],"risks":[],"priority":"P1"}'
+
+    with patch(
+        "app.services.hopenvision_proposal_service._fetch_hopenvision_context",
+        return_value=[],
+    ), patch(
+        "app.services.hopenvision_proposal_service.index_hopenvision_repo",
+        return_value={"summary": {"controllers": 1}},
+    ), patch(
+        "app.services.hopenvision_proposal_service.evaluate_topic",
+        return_value=fit,
+    ), patch(
+        "app.services.hopenvision_proposal_service.chat",
+        return_value=_fake_chat_result(fake_response),
+    ):
+        results = propose_from_tech_topics(
+            session, topics, auto_dev_plan=False, fitness_threshold=60,
+        )
+
+    assert len(results) == 1
+    r = results[0]
+    assert r.status == "generated"
+    assert r.fitness_score == 75
+    assert r.impact_area == "backend-api"
+    assert r.effort_hours == 12
+    assert r.fitness_reason == "컨트롤러 매핑"

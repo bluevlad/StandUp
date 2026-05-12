@@ -128,9 +128,15 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
                     auto_dev_plan=settings.tech_trend_auto_dev_plan,
                     max_topics=settings.tech_trend_max_topics_per_run,
                 )
+            filtered_out = sum(
+                1 for p in tech_proposals if getattr(p, "status", "") == "filtered_out"
+            )
+            generated = len(tech_proposals) - filtered_out
             logger.info(
-                "tech_topic 제안 %d건 생성 (auto_dev_plan=%s)",
-                len(tech_proposals), settings.tech_trend_auto_dev_plan,
+                "tech_topic 처리 결과 — 통과=%d (auto_dev_plan=%s), "
+                "filtered_out=%d (threshold=%d)",
+                generated, settings.tech_trend_auto_dev_plan, filtered_out,
+                settings.hopen_brief_fitness_threshold,
             )
         except Exception as e:  # noqa: BLE001
             logger.warning("tech_topic 제안 실패 (파이프라인은 계속): %s", e,
