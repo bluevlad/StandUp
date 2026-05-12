@@ -113,6 +113,21 @@ class Settings(BaseSettings):
         default=3, env="TECH_TREND_MAX_TOPICS_PER_RUN",
     )
 
+    # ── HopenVision-Tight (PR4) — 적합도 필터 + repo index ───────────────────
+    hopenvision_repo_path: str = Field(
+        default="", env="HOPENVISION_REPO_PATH",
+    )  # 예: /Users/rainend/GIT/hopenvision
+    hopenvision_stack_tags: str = Field(
+        default="java,spring,spring-boot,react,postgresql,typescript,jpa,jwt,docker",
+        env="HOPENVISION_STACK_TAGS",
+    )  # 콤마 구분 — 토픽 텍스트와 매칭할 HopenVision 스택 태그
+    hopen_brief_fitness_threshold: int = Field(
+        default=60, env="HOPEN_BRIEF_FITNESS_THRESHOLD",
+    )  # 0~100. 미달 토픽은 LLM 제안 생성 skip.
+    hopen_repo_index_ttl_hours: int = Field(
+        default=24, env="HOPEN_REPO_INDEX_TTL_HOURS",
+    )
+
     # Naver News API (선택 — 미설정 시 Google News RSS 만 사용)
     naver_client_id: str = Field(default="", env="NAVER_CLIENT_ID")
     naver_client_secret: str = Field(default="", env="NAVER_CLIENT_SECRET")
