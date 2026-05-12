@@ -42,7 +42,7 @@ def _embed_one(client: httpx.Client, text: str) -> list[float] | None:
 
 def embed_texts(texts: Iterable[str]) -> list[list[float] | None]:
     out: list[list[float] | None] = []
-    with httpx.Client() as client:
+    with httpx.Client(trust_env=False) as client:
         for t in texts:
             out.append(_embed_one(client, t))
     return out
@@ -62,7 +62,7 @@ def embed_pending_chunks(batch_size: int = 64) -> int:
             if not chunks:
                 break
 
-            with httpx.Client() as client:
+            with httpx.Client(trust_env=False) as client:
                 for ch in chunks:
                     emb = _embed_one(client, ch.chunk_text[:8000])
                     if emb is None:
