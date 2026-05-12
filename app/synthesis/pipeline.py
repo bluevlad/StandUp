@@ -50,6 +50,12 @@ class TechTopic:
     digest_url: str = ""
     digest_event_id: str = ""
     news_articles: list[dict] = field(default_factory=list)
+    # PR-SU-11 — medium-digest-agent v2 새 필드 (없으면 비어있음, 안전 default).
+    importance_score: Optional[int] = None
+    importance_factors: list[str] = field(default_factory=list)
+    interpretation_core: str = ""
+    interpretation_why: str = ""
+    interpretation_takeaways: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -273,6 +279,19 @@ def _collect_tech_topics(events: list[IngestionEvent]) -> list[TechTopic]:
             topic.digest_risks = (c.get("risks") or "")[:600]
             topic.digest_url = digest_ev.source_url or ""
             topic.digest_event_id = str(digest_ev.id)
+            # PR-SU-11 — v2 필드 (medium-digest-agent PR-MDA-2/3 산출). canonical 에
+            # 없을 수도 있으므로 안전 fallback.
+            score_raw = c.get("importance_score")
+            if isinstance(score_raw, (int, float)):
+                topic.importance_score = int(score_raw)
+            factors = c.get("importance_factors") or []
+            if isinstance(factors, list):
+                topic.importance_factors = [str(f)[:200] for f in factors[:5]]
+            topic.interpretation_core = (c.get("interpretation_core") or "")[:600]
+            topic.interpretation_why = (c.get("interpretation_why") or "")[:400]
+            takeaways = c.get("interpretation_takeaways") or []
+            if isinstance(takeaways, list):
+                topic.interpretation_takeaways = [str(t)[:200] for t in takeaways[:4]]
         for nev in news_evs:
             nc = nev.canonical or {}
             topic.news_articles.append({

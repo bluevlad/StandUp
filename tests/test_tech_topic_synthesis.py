@@ -269,3 +269,54 @@ def test_render_newsletter_does_not_emit_anchor_for_file_url():
     )])
     result = render_newsletter(syn)
     assert "file:///tmp/x.md" not in result["html"]
+
+
+# ── PR-SU-11: medium-digest v2 필드 (_collect_tech_topics 안 전파) ────────
+
+def test_collect_tech_topics_passes_v2_fields_into_topic():
+    """canonical 에 importance_score / interpretation_* 가 있으면 TechTopic 에 흘러야."""
+    ev = FakeEvent(
+        id="dv2",
+        source_type=SOURCE_MEDIUM_DIGEST_REPORT,
+        title="[Spring Boot REST Clients] 적용 제안",
+        occurred_at=datetime(2026, 5, 12, tzinfo=timezone.utc),
+        canonical={
+            "keyword": "Spring Boot REST Clients",
+            "priority": "high",
+            "category": "api-design",
+            "difficulty": "low",
+            "maturity": "mainstream",
+            "tech_description": "Spring Boot 4 의 RestClient ...",
+            "target_scope": "Controllers, services",
+            "risks": "RestTemplate 마이그레이션",
+            # PR-MDA-2/3 새 필드
+            "importance_score": 78,
+            "importance_factors": ["mainstream 채택", "api 직접 매핑"],
+            "interpretation_core": "RestClient 도입으로 호출 단순화.",
+            "interpretation_why": "Spring 6+ stable 이후 확산.",
+            "interpretation_takeaways": [
+                "RestTemplate → RestClient 마이그레이션",
+                "fluent 가독성 향상",
+                "WebClient 와 선택 기준 이해",
+            ],
+        },
+    )
+    topics = _collect_tech_topics([ev])
+    assert len(topics) == 1
+    t = topics[0]
+    assert t.importance_score == 78
+    assert t.importance_factors == ["mainstream 채택", "api 직접 매핑"]
+    assert "RestClient" in t.interpretation_core
+    assert "Spring 6" in t.interpretation_why
+    assert len(t.interpretation_takeaways) == 3
+    assert "마이그레이션" in t.interpretation_takeaways[0]
+
+
+def test_collect_tech_topics_handles_missing_v2_fields_safely():
+    """v2 필드 없는 옛 canonical 도 깨지지 않고 빈 default 로."""
+    ev = _digest_event(keyword="Legacy", title="[Legacy] 적용", event_id="dv1")
+    topics = _collect_tech_topics([ev])
+    assert topics[0].importance_score is None
+    assert topics[0].importance_factors == []
+    assert topics[0].interpretation_core == ""
+    assert topics[0].interpretation_takeaways == []

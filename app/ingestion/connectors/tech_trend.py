@@ -136,6 +136,12 @@ class TechTrendConnector(Connector):
             "risks": report.risks,
             "pilot_scope": report.pilot_scope,
             "file_path": str(report.file_path),
+            # PR-SU-11 — medium-digest-agent v2 새 필드
+            "importance_score": report.importance_score,
+            "importance_factors": report.importance_factors,
+            "interpretation_core": report.interpretation_core,
+            "interpretation_why": report.interpretation_why,
+            "interpretation_takeaways": report.interpretation_takeaways,
         }
 
         return CanonicalEvent(
