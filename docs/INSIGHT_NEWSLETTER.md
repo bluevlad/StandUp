@@ -222,6 +222,75 @@ PR4 의 적합도 게이트를 통과한 토픽에 대해 *카드형 메일 한 
 
 PR6 에서 일일 cron 으로 이 템플릿을 호출하는 별도 `[HopenTechBrief]` 메일 채널 추가 예정.
 
+## 일일 [HopenTechBrief] 채널 (PR6)
+
+PR4(게이트) + PR5(detailer) 를 *일일 케이던스* 로 운영하는 별도 메일 채널. 주간
+Insight Newsletter 와 다음과 같이 분리되어 공존한다.
+
+| 항목 | 주간 Insight | **일일 HopenTechBrief** |
+|------|--------------|-------------------------|
+| 스케줄 | 월요일 09:00 KST | 매일 09:00 KST |
+| 윈도우 | 최근 7일 | 최근 24h (env 조정) |
+| 합성 | exaone3.5 cascade 풀세트 | tech_topics 추출만 |
+| tech 게이트 | 스택 매칭만 (≥25, 무관 토픽 컷) | 스택+LLM 합산 (≥60, 깊이있게) |
+| 메일 채널 | `report_types LIKE '%insight%'` | `report_types LIKE '%hopen_tech%'` |
+| 토픽 깊이 | 키워드 + 디지스트 hint | + Mermaid + 사례 + PoC 힌트 |
+| 빈 결과 시 | 항상 발송 | 통과 0건이면 발송 skip |
+
+```
+[CRON 09:00 KST]
+  ↓
+IngestionHub (24h 윈도우)
+  ↓
+_collect_tech_topics (medium_digest_report + tech_news_article)
+  ↓
+propose_from_tech_topics
+  ↓ (게이트 통과 토픽 ≥1)
+render_hopen_tech_brief (hopen_tech_brief.html)
+  ↓
+send_hopen_tech_brief (hopen_tech 채널 수신자)
+```
+
+핵심 환경변수 (PR6):
+
+| Key | 기본값 | 설명 |
+|-----|--------|------|
+| `HOPEN_BRIEF_DAILY_ENABLED` | `false` | 일일 cron 활성화 |
+| `HOPEN_BRIEF_DAILY_HOUR` / `_MINUTE` | `9` / `0` | KST 발송 시각 |
+| `HOPEN_BRIEF_WINDOW_HOURS` | `24` | 윈도우 시간 |
+| `HOPEN_BRIEF_MAX_PER_DAY` | `3` | 카드로 표현할 최대 토픽 수 (LLM·fetch 비용 가드) |
+| `HOPEN_BRIEF_SUBJECT_PREFIX` | `[HopenTechBrief]` | 메일 제목 prefix |
+| `WEEKLY_TECH_STACK_MIN_SCORE` | `25` | 주간 newsletter tech 섹션 게이트 (스택만) |
+
+수동 트리거:
+
+```bash
+# 실제 발송
+curl -X POST http://localhost:9060/api/v1/insight/hopen-brief/run \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": false}'
+
+# dry-run (DB 행은 저장, 메일 미발송)
+curl -X POST http://localhost:9060/api/v1/insight/hopen-brief/run \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true, "window_hours": 48}'
+```
+
+수신자 등록:
+
+```sql
+INSERT INTO recipients (name, email, report_types, is_active)
+VALUES ('홍길동', 'a@b.com', 'hopen_tech', true);
+
+-- 기존 수신자에 추가
+UPDATE recipients SET report_types = 'insight,hopen_tech' WHERE email = 'a@b.com';
+```
+
+운영 메모:
+- 같은 `newsletters` 테이블을 재사용 — `synthesis_meta.channel='hopen_tech'` 로 구분, 일일은 `period_start == period_end`.
+- 통과 토픽 0건이면 newsletter row 도 생성하지 않고 빠르게 종료 (`skipped_reason='no_eligible_topics'`).
+- `propose_from_tech_topics` 의 LLM 호출은 토픽당 1~3 회 (게이트 LLM + proposal LLM + detailer 2회). 1일 3토픽 가정 시 최대 12회 LLM 호출.
+
 ## 향후 확장
 
 1. **자동 효과 검증** (`docs/AGENT_DATA_CONTRACT.md` 참고) — fix 후 재발 여부 자동 라벨

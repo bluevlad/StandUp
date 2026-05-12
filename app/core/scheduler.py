@@ -183,6 +183,21 @@ def setup_scheduler():
             "insight_weekly", "Insight 주간 뉴스레터 발송 (exaone3.5 cascade)",
         )
 
+        # HopenTechBrief — 일일 (PR6). insight 모드 안에서 별도 토글로 제어.
+        if settings.hopen_brief_daily_enabled:
+            from ..agents_v2.hopen_tech_brief import run_daily_job
+
+            _safe_add_job(
+                run_daily_job,
+                CronTrigger(
+                    hour=settings.hopen_brief_daily_hour,
+                    minute=settings.hopen_brief_daily_minute,
+                    timezone=tz,
+                ),
+                "hopen_tech_brief_daily",
+                "HopenTechBrief 일일 카드 메일 발송 (게이트+detailer)",
+            )
+
     scheduler.start()
     logger.info("스케줄러 시작 완료")
 

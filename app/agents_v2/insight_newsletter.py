@@ -70,6 +70,26 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
                 len(syn.source_event_ids),
                 {k: syn.meta.get(k) for k in ("stage1_ms", "stage2_ms", "stage3_ms")})
 
+    # PR6 — 주간 newsletter 의 tech 섹션은 HopenVision 스택 매칭만 통과한 토픽으로
+    # 축약. 일일 [HopenTechBrief] 가 깊이를 다루므로, 주간은 *얕은* 게이트로 무관
+    # 토픽(Autonomous-QA-Agent / 머신비전 등) 만 컷.
+    if syn.tech_topics:
+        from ..services.tech_topic_filter import evaluate_topic
+        original = len(syn.tech_topics)
+        syn.tech_topics = [
+            t for t in syn.tech_topics
+            if evaluate_topic(
+                t, use_llm=False,
+                threshold=settings.weekly_tech_stack_min_score,
+            ).eligible
+        ]
+        if len(syn.tech_topics) < original:
+            logger.info(
+                "weekly tech 섹션 축약: %d → %d (stack threshold=%d)",
+                original, len(syn.tech_topics),
+                settings.weekly_tech_stack_min_score,
+            )
+
     # 3. Render
     rendered = render_newsletter(syn)
 
