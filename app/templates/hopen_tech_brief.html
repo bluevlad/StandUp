@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>{{ subject }}</title>
+<style>
+  body { font-family: -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+         color: #1f2328; line-height: 1.65; max-width: 760px; margin: 0 auto;
+         padding: 24px; background: #fafbfc; }
+  .card { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px;
+          padding: 24px 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+  h1 { font-size: 22px; margin: 0 0 4px; color: #ef4444; border-bottom: 2px solid #ef4444;
+       padding-bottom: 8px; }
+  h2 { font-size: 16px; margin-top: 24px; margin-bottom: 8px; color: #24292f; }
+  h3 { font-size: 15px; margin: 14px 0 6px; color: #57606a; }
+  a { color: #0969da; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: #f6f8fa; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+  pre { background: #f6f8fa; padding: 12px; border-radius: 6px; overflow-x: auto;
+        font-size: 11.5px; line-height: 1.45; }
+  .meta { color: #6e7781; font-size: 12px; }
+  .footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #e1e4e8;
+            font-size: 12px; color: #6e7781; text-align: center; }
+
+  .topic { border: 1px solid #e1e4e8; border-radius: 8px; padding: 18px 22px;
+           margin-top: 18px; background: #fff; }
+  .topic-header { display: flex; justify-content: space-between; align-items: baseline;
+                  border-bottom: 1px dashed #e1e4e8; padding-bottom: 6px; margin-bottom: 10px; }
+  .topic-keyword { font-size: 17px; font-weight: 600; color: #ef4444; }
+  .topic-score { font-size: 12px; color: #6e7781; }
+  .topic-score b { color: #1f2328; }
+
+  .badges { display: inline-flex; gap: 4px; margin-left: 6px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px;
+           font-weight: 500; }
+  .badge-priority-critical { background: #ffebe9; color: #cf222e; }
+  .badge-priority-high     { background: #fff8c5; color: #9a6700; }
+  .badge-priority-medium   { background: #ddf4ff; color: #0969da; }
+  .badge-priority-low      { background: #dafbe1; color: #1a7f37; }
+  .badge-impact            { background: #f1f3f5; color: #57606a; }
+
+  .topic-summary { color: #1f2328; font-size: 14px; margin: 8px 0 4px; }
+  .topic-target  { color: #57606a; font-size: 13px; }
+
+  .diagram-block { background: #0d1117; color: #c9d1d9; padding: 12px 16px;
+                   border-radius: 6px; font-family: ui-monospace, SFMono-Regular, Menlo,
+                   "JetBrains Mono", monospace; font-size: 12px; line-height: 1.5;
+                   overflow-x: auto; white-space: pre; }
+  .diagram-note { font-size: 11px; color: #6e7781; margin-top: 4px; }
+  .diagram-note a { color: #0969da; }
+
+  .cases { display: block; }
+  .case  { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f0f2f4; }
+  .case:last-child { border-bottom: 0; }
+  .case-thumb { flex: 0 0 96px; height: 64px; background: #f0f2f4; border-radius: 4px;
+                overflow: hidden; }
+  .case-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .case-body  { flex: 1; min-width: 0; }
+  .case-title { font-size: 13px; font-weight: 500; margin: 0 0 2px; }
+  .case-title a { color: #1f2328; }
+  .case-meta  { font-size: 11px; color: #6e7781; }
+  .case-desc  { font-size: 12px; color: #57606a; margin-top: 2px;
+                display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                overflow: hidden; }
+
+  .code-hint { background: #f6f8fa; border-left: 3px solid #ef4444; padding: 10px 14px;
+               margin: 8px 0; border-radius: 0 6px 6px 0; }
+  .code-hint-file { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                    font-size: 12px; color: #cf222e; word-break: break-all; }
+  .code-hint-sketch { font-size: 13px; color: #1f2328; margin: 4px 0 6px; }
+  .code-hint-snippet { background: #fff; border: 1px solid #e1e4e8; padding: 10px 14px;
+                       border-radius: 4px; font-size: 11.5px; overflow-x: auto;
+                       white-space: pre; }
+
+  .empty { color: #8c959f; font-size: 12px; font-style: italic; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>{{ headline }}</h1>
+    <div class="meta">
+      {{ generated_at }} · 적합도 통과 {{ topics|length }}건 / 필터 {{ filtered_out_count }}건
+    </div>
+
+    {% if not topics %}
+      <p class="empty" style="margin-top: 16px;">
+        오늘은 HopenVision 적합도 임계치를 통과한 토픽이 없습니다.
+      </p>
+    {% endif %}
+
+    {% for t in topics %}
+    <div class="topic">
+      <div class="topic-header">
+        <div>
+          <span class="topic-keyword">{{ t.keyword }}</span>
+          <span class="badges">
+            {% if t.priority %}
+            <span class="badge badge-priority-{{ t.priority }}">{{ t.priority }}</span>
+            {% endif %}
+            {% if t.impact_area and t.impact_area != "unknown" %}
+            <span class="badge badge-impact">{{ t.impact_area }}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="topic-score">
+          적합도 <b>{{ t.fitness_score }}</b>/100
+          {% if t.effort_hours %} · 예상공수 <b>{{ t.effort_hours }}h</b>{% endif %}
+        </div>
+      </div>
+
+      {% if t.digest_title %}
+      <div class="topic-summary"><strong>{{ t.digest_title }}</strong></div>
+      {% endif %}
+      {% if t.digest_summary %}
+      <div class="topic-target">{{ t.digest_summary }}</div>
+      {% endif %}
+
+      {% if t.diagnosis %}
+      <h3>HopenVision 적용 진단</h3>
+      <div class="topic-target">{{ t.diagnosis }}</div>
+      {% endif %}
+
+      {% if t.diagram_mermaid %}
+      <h3>구성도 (As-Is → To-Be)</h3>
+      <div class="diagram-block">{{ t.diagram_mermaid }}</div>
+      <div class="diagram-note">
+        Mermaid 코드 — <a href="https://mermaid.live/edit" target="_blank">mermaid.live</a>
+        에 붙여넣어 그래프로 확인하세요.
+      </div>
+      {% endif %}
+
+      {% if t.case_studies %}
+      <h3>외부 적용 사례</h3>
+      <div class="cases">
+        {% for c in t.case_studies %}
+        <div class="case">
+          {% if c.image_url %}
+          <div class="case-thumb"><img src="{{ c.image_url }}" alt=""></div>
+          {% else %}
+          <div class="case-thumb"></div>
+          {% endif %}
+          <div class="case-body">
+            <div class="case-title">
+              {% if c.url %}<a href="{{ c.url }}" target="_blank">{{ c.title }}</a>
+              {% else %}{{ c.title }}{% endif %}
+            </div>
+            <div class="case-meta">
+              {% if c.site_name %}{{ c.site_name }} · {% endif %}
+              {% if c.source %}{{ c.source }}{% endif %}
+              {% if c.published_at %} · {{ c.published_at[:10] }}{% endif %}
+            </div>
+            {% if c.description %}
+            <div class="case-desc">{{ c.description }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if t.code_hints %}
+      <h3>PoC 코드 힌트</h3>
+      {% for h in t.code_hints %}
+      <div class="code-hint">
+        <div class="code-hint-file">{{ h.file }}</div>
+        <div class="code-hint-sketch">{{ h.change_sketch }}</div>
+        {% if h.snippet %}
+        <pre class="code-hint-snippet">{{ h.snippet }}</pre>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if t.candidate_modules %}
+      <h3>후보 모듈</h3>
+      <ul style="margin-top: 4px;">
+        {% for m in t.candidate_modules %}
+        <li>
+          <code>{{ m.module }}</code>
+          {% if m.effort %}<span class="meta">({{ m.effort }})</span>{% endif %}
+          {% if m.rationale %} — {{ m.rationale }}{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% if t.risks %}
+      <h3>리스크</h3>
+      <ul style="margin-top: 4px;">
+        {% for r in t.risks %}<li>{{ r }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+      StandUp HopenTechBrief · {{ generated_at }}
+    </div>
+  </div>
+</body>
+</html>

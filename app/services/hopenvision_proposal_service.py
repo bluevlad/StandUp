@@ -19,7 +19,7 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import select
@@ -32,6 +32,7 @@ from ..models.dev_plan import (
 from ..models.insight import HopenVisionProposal
 from ..models.issue import WorkItem
 from ..synthesis.ollama_client import chat
+from ..synthesis.tech_brief_detailer import TopicDetail, detail_topic
 from .hopenvision_repo_indexer import condense_for_prompt, index_hopenvision_repo
 from .tech_topic_filter import FitnessResult, evaluate_topic
 from .topic_cluster_service import get_topic_clusters
@@ -85,6 +86,10 @@ class ProposalResult:
     impact_area: Optional[str] = None
     effort_hours: Optional[int] = None
     fitness_reason: Optional[str] = None
+    # PR5 — 상세 산출물 (detailer)
+    diagram_mermaid: str = ""
+    case_studies: list = field(default_factory=list)
+    code_hints: list = field(default_factory=list)
 
 
 def _build_user_prompt(cluster_summary: dict, hopenvision_context: list[dict]) -> str:
@@ -455,6 +460,7 @@ def _generate_proposal_for_tech_topic(
     force: bool,
     repo_index: Optional[dict] = None,
     fitness: Optional[FitnessResult] = None,
+    enable_detail: bool = True,
 ) -> ProposalResult:
     cluster_key = _tech_topic_cluster_key(topic.keyword)
 
@@ -481,6 +487,9 @@ def _generate_proposal_for_tech_topic(
                 fitness_score=cached.fitness_score,
                 impact_area=cached.impact_area,
                 effort_hours=cached.effort_hours,
+                diagram_mermaid=cached.diagram_mermaid or "",
+                case_studies=cached.case_studies or [],
+                code_hints=cached.code_hints or [],
             )
 
     summary = _build_tech_topic_summary(topic)
@@ -498,6 +507,18 @@ def _generate_proposal_for_tech_topic(
     )
     parsed = _parse_llm_json(gen.text) if gen.ok else None
 
+    # PR5 — proposal LLM 호출이 성공한 경우에만 detailer 호출 (실패해도 흡수)
+    detail: Optional[TopicDetail] = None
+    if enable_detail and gen.ok and parsed:
+        try:
+            detail = detail_topic(topic, repo_index=repo_index, fitness=fitness)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("detailer 실패 keyword=%s: %s", topic.keyword, e)
+
+    detail_storage = detail.to_storage_dict() if detail else {
+        "diagram_mermaid": "", "case_studies": [], "code_hints": [],
+    }
+
     proposal = HopenVisionProposal(
         cluster_key=cluster_key,
         model=model,
@@ -512,6 +533,9 @@ def _generate_proposal_for_tech_topic(
         fitness_score=fitness.score if fitness else None,
         impact_area=fitness.impact_area if fitness else None,
         effort_hours=fitness.effort_hours if fitness else None,
+        diagram_mermaid=detail_storage["diagram_mermaid"] or None,
+        case_studies=detail_storage["case_studies"],
+        code_hints=detail_storage["code_hints"],
     )
     session.add(proposal)
     session.flush()
@@ -532,6 +556,9 @@ def _generate_proposal_for_tech_topic(
         impact_area=proposal.impact_area,
         effort_hours=proposal.effort_hours,
         fitness_reason=fitness.reason if fitness else None,
+        diagram_mermaid=proposal.diagram_mermaid or "",
+        case_studies=proposal.case_studies or [],
+        code_hints=proposal.code_hints or [],
     )
 
 
@@ -544,6 +571,7 @@ def propose_from_tech_topics(
     max_topics: int = 5,
     fitness_threshold: Optional[int] = None,
     use_llm_fitness: bool = True,
+    enable_detail: bool = True,
 ) -> list[ProposalResult]:
     """tech_trend 토픽 묶음 → HopenVision 제안 (+옵션상 DevPlan 초안화).
 
@@ -624,11 +652,12 @@ def propose_from_tech_topics(
             ))
             continue
 
-        # 2) 통과 토픽만 LLM 제안 생성
+        # 2) 통과 토픽만 LLM 제안 생성 + detailer 호출
         try:
             result = _generate_proposal_for_tech_topic(
                 session, topic, hopenvision_ctx,
                 force=force, repo_index=repo_index, fitness=fitness,
+                enable_detail=enable_detail,
             )
         except Exception as e:  # noqa: BLE001
             logger.error("tech topic 제안 실패 keyword=%s: %s",
