@@ -291,6 +291,37 @@ UPDATE recipients SET report_types = 'insight,hopen_tech' WHERE email = 'a@b.com
 - 통과 토픽 0건이면 newsletter row 도 생성하지 않고 빠르게 종료 (`skipped_reason='no_eligible_topics'`).
 - `propose_from_tech_topics` 의 LLM 호출은 토픽당 1~3 회 (게이트 LLM + proposal LLM + detailer 2회). 1일 3토픽 가정 시 최대 12회 LLM 호출.
 
+## 운영 적용 (PR7) — 마운트·deploy.yml 토글
+
+운영 컨테이너(`docker-compose.production.yml` + `.github/workflows/deploy.yml`)
+에서 tech_trend 입력과 HopenVision 게이트 컨텍스트를 동작시키려면 호스트 경로를
+컨테이너로 마운트해야 한다. PR7 부터 다음 마운트가 적용:
+
+```yaml
+volumes:
+  - ./logs:/app/logs
+  - /Users/rainend/GIT/medium-digest-agent/reports:/data/medium-digest:ro
+  - /Users/rainend/GIT/hopenvision:/data/hopenvision:ro
+```
+
+`deploy.yml` 의 `.env.production` 생성부에 다음 7개 변수가 추가됨:
+
+| 변수 | 기본값 (vars 미설정 시) | GH vars 로 토글 |
+|------|-----------------------|-----------------|
+| `STANDUP_MODE` | `both` | ✅ |
+| `TECH_TREND_ENABLED` | `true` | ✅ |
+| `TECH_TREND_KEYWORDS` | `java,spring,react,postgresql,typescript` | ✅ |
+| `MEDIUM_DIGEST_REPORTS_DIR` | `/data/medium-digest` (마운트 경로 고정) | ❌ |
+| `HOPENVISION_REPO_PATH` | `/data/hopenvision` (마운트 경로 고정) | ❌ |
+| `HOPEN_BRIEF_DAILY_ENABLED` | `false` | ✅ (PR8 에서 true 전환 예정) |
+| `HOPEN_BRIEF_FITNESS_THRESHOLD` | `60` | ✅ |
+
+운영 토글 절차:
+1. **GitHub repo → Settings → Secrets and variables → Actions → Variables 탭**
+2. `HOPEN_BRIEF_DAILY_ENABLED` 등 vars 추가/변경
+3. `prod` 브랜치에 빈 commit push 또는 main→prod 머지로 Deploy 워크플로 재실행
+4. 새 컨테이너 healthz + `GET /api/v1/health` 의 `scheduler.jobs` 에서 `hopen_tech_brief_daily` 등록 확인
+
 ## 향후 확장
 
 1. **자동 효과 검증** (`docs/AGENT_DATA_CONTRACT.md` 참고) — fix 후 재발 여부 자동 라벨

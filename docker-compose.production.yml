@@ -13,6 +13,11 @@ services:
       - ROOT_PATH=/standup
     volumes:
       - ./logs:/app/logs
+      # PR7 — tech_trend + HopenVision 입력 마운트 (운영 MacBook 절대 경로).
+      # 컨테이너 안에서는 /data/* 로 일관 참조 — .env 의 MEDIUM_DIGEST_REPORTS_DIR
+      # / HOPENVISION_REPO_PATH 와 1:1 매칭.
+      - /Users/rainend/GIT/medium-digest-agent/reports:/data/medium-digest:ro
+      - /Users/rainend/GIT/hopenvision:/data/hopenvision:ro
     restart: always
     networks:
       - app-network

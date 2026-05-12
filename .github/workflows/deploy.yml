@@ -33,6 +33,12 @@ jobs:
           MONTHLY_REPORT_HOUR: ${{ vars.MONTHLY_REPORT_HOUR }}
           MONTHLY_REPORT_MINUTE: ${{ vars.MONTHLY_REPORT_MINUTE }}
           LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+          # PR7 — tech_trend / HopenVision (vars 로 운영자 토글 가능). 기본은 안전한 off.
+          STANDUP_MODE: ${{ vars.STANDUP_MODE }}
+          TECH_TREND_ENABLED: ${{ vars.TECH_TREND_ENABLED }}
+          TECH_TREND_KEYWORDS: ${{ vars.TECH_TREND_KEYWORDS }}
+          HOPEN_BRIEF_DAILY_ENABLED: ${{ vars.HOPEN_BRIEF_DAILY_ENABLED }}
+          HOPEN_BRIEF_FITNESS_THRESHOLD: ${{ vars.HOPEN_BRIEF_FITNESS_THRESHOLD }}
         run: |
           cat > .env.production << EOF
           DATABASE_URL=${DATABASE_URL}
@@ -49,6 +55,17 @@ jobs:
           MONTHLY_REPORT_MINUTE=${MONTHLY_REPORT_MINUTE:-0}
           LOG_LEVEL=${LOG_LEVEL:-INFO}
           API_PORT=9060
+
+          # ── PR7 — tech_trend / HopenVision (모드·게이트 토글) ───────────
+          STANDUP_MODE=${STANDUP_MODE:-both}
+          TECH_TREND_ENABLED=${TECH_TREND_ENABLED:-true}
+          TECH_TREND_KEYWORDS=${TECH_TREND_KEYWORDS:-java,spring,react,postgresql,typescript}
+          # 컨테이너 안에서 마운트 결과 경로 (docker-compose.production.yml volumes 와 매칭).
+          MEDIUM_DIGEST_REPORTS_DIR=/data/medium-digest
+          HOPENVISION_REPO_PATH=/data/hopenvision
+          # 일일 [HopenTechBrief] cron — vars 로 즉시 ON/OFF (PR8 에서 true 로 전환 예정).
+          HOPEN_BRIEF_DAILY_ENABLED=${HOPEN_BRIEF_DAILY_ENABLED:-false}
+          HOPEN_BRIEF_FITNESS_THRESHOLD=${HOPEN_BRIEF_FITNESS_THRESHOLD:-60}
           EOF
 
       - name: Run deploy script
