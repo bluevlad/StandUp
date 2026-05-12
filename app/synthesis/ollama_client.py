@@ -51,7 +51,13 @@ def chat(
         },
     }
     try:
-        with httpx.Client(timeout=timeout or settings.ollama_timeout_sec) as client:
+        # trust_env=False — OrbStack 등 호스트 환경의 HTTPS_PROXY/HTTP_PROXY 가
+        # Ollama 호출까지 가로채는 사고 방지. Ollama 는 보통 같은 호스트
+        # (host.docker.internal:11434) 에 있어 프록시를 거치면 안 된다.
+        with httpx.Client(
+            timeout=timeout or settings.ollama_timeout_sec,
+            trust_env=False,
+        ) as client:
             r = client.post(url, json=payload)
             r.raise_for_status()
             data = r.json()
