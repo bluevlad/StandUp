@@ -37,7 +37,8 @@ class LogAnalyzerConnector(Connector):
 
     def _get(self, path: str, **params) -> Any:
         url = f"{self.base_url}{path}"
-        with httpx.Client(timeout=30.0) as client:
+        # trust_env=False — OrbStack 등 호스트 proxy 가 내부 호스트 호출까지 가로채는 사고 방지.
+        with httpx.Client(timeout=30.0, trust_env=False) as client:
             r = client.get(url, params=params)
             r.raise_for_status()
             return r.json()
