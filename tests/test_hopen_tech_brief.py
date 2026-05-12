@@ -121,6 +121,47 @@ def test_render_handles_no_topics():
     assert "통과 0" in rendered["html"] or "임계치" in rendered["html"]
 
 
+def test_render_includes_v2_interpretation_and_importance():
+    """PR-SU-11 — interpretation 박스 + 외부 중요도 점수 노출 검증."""
+    topics = [TechTopic(
+        keyword="Spring Boot REST Clients",
+        digest_title="[Spring Boot REST Clients] 적용 제안",
+        digest_summary="외부 호출 단순화",
+        importance_score=78,
+        importance_factors=["mainstream 채택", "api 직접 매핑"],
+        interpretation_core="RestClient 도입으로 호출 단순화.",
+        interpretation_why="Spring 6+ stable 이후 확산.",
+        interpretation_takeaways=[
+            "RestTemplate → RestClient 마이그레이션",
+            "fluent 가독성 향상",
+        ],
+    )]
+    proposals = [
+        ProposalResult(
+            proposal_id="p1",
+            cluster_key="tech:spring-boot-rest-clients",
+            diagnosis="d", candidate_modules=[], risks=[], priority="medium",
+            model="m", eval_ms=0, status="generated", raw_response=None,
+            fitness_score=60, impact_area="backend-api", effort_hours=20,
+        ),
+    ]
+    rendered = render_hopen_tech_brief(
+        proposals, topics, period=date(2026, 5, 12),
+        eligible=1, filtered_out=0,
+    )
+    html = rendered["html"]
+    # interpretation 박스
+    assert "핵심 메시지" in html
+    assert "RestClient 도입으로 호출 단순화" in html
+    assert "왜 지금 화제" in html
+    assert "Take-away" in html
+    assert "fluent 가독성 향상" in html
+    # 외부 중요도
+    assert "외부 중요도" in html
+    assert "78/100" in html
+    assert "mainstream 채택" in html
+
+
 # ── run_daily 통합 (DB·LLM·hub·mail 모킹) ───────────────────────────────
 
 def _fake_event(source_type="medium_digest_report"):
