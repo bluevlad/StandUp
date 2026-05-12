@@ -188,6 +188,8 @@ def run_daily(
     dry_run: bool = False,
     window_hours: Optional[int] = None,
     skip_ingest: bool = False,
+    force_refresh: bool = False,
+    max_topics: Optional[int] = None,
 ) -> DailyBriefResult:
     """일일 HopenTechBrief 1회 실행.
 
@@ -195,6 +197,9 @@ def run_daily(
         dry_run: True 면 메일 발송 없음 (DB 행은 저장).
         window_hours: 최근 N시간. None 이면 settings.hopen_brief_window_hours.
         skip_ingest: True 면 IngestionHub 호출을 건너뛴다 (이미 다른 곳에서 돌린 경우).
+        force_refresh: True 면 hopenvision_proposals 캐시 무시하고 LLM 재호출 (PR10).
+        max_topics: None 이면 settings.hopen_brief_max_per_day. 운영자가 한 번에
+            더 많은 토픽을 평가해보고 싶을 때 사용 (PR10).
     """
     wh = window_hours if window_hours is not None else settings.hopen_brief_window_hours
     today_kst = now_kst().date()
@@ -220,13 +225,15 @@ def run_daily(
                 len(events), len(tech_topics))
 
     # 3) 게이트 + detailer + (옵션) DevPlan
+    effective_max = max_topics if max_topics is not None else settings.hopen_brief_max_per_day
     proposals: list[ProposalResult]
     with SessionLocal() as session:
         proposals = propose_from_tech_topics(
             session,
             tech_topics,
             auto_dev_plan=settings.tech_trend_auto_dev_plan,
-            max_topics=settings.hopen_brief_max_per_day,
+            max_topics=effective_max,
+            force=force_refresh,
         )
 
     filtered_out = sum(1 for p in proposals if p.status == "filtered_out")

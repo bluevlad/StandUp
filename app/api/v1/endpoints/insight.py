@@ -150,6 +150,9 @@ class HopenBriefRunRequest(BaseModel):
     dry_run: bool = False
     window_hours: Optional[int] = None
     skip_ingest: bool = False
+    # PR10 — 운영자 수동 트리거 시 캐시·평가 범위 조정.
+    force_refresh: bool = False  # hopenvision_proposals 캐시 무시
+    max_topics: Optional[int] = None  # 1회 평가 토픽 상한 (기본 settings.hopen_brief_max_per_day)
 
 
 class HopenBriefRunResponse(BaseModel):
@@ -165,11 +168,17 @@ class HopenBriefRunResponse(BaseModel):
 
 @router.post("/hopen-brief/run", response_model=HopenBriefRunResponse)
 def trigger_hopen_brief(req: HopenBriefRunRequest):
-    """HopenTechBrief 일일 1회 즉시 실행 (수동 트리거 / dry-run)."""
+    """HopenTechBrief 일일 1회 즉시 실행 (수동 트리거 / dry-run).
+
+    `force_refresh=true` 면 토픽 캐시(`hopenvision_proposals`) 를 무시하고 LLM 재호출.
+    `max_topics` 로 1회 평가 토픽 상한 조정 (기본 `HOPEN_BRIEF_MAX_PER_DAY=3`).
+    """
     res = run_daily_hopen_tech(
         dry_run=req.dry_run,
         window_hours=req.window_hours,
         skip_ingest=req.skip_ingest,
+        force_refresh=req.force_refresh,
+        max_topics=req.max_topics,
     )
     return HopenBriefRunResponse(
         newsletter_id=res.newsletter_id,
