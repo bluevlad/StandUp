@@ -140,6 +140,16 @@ def _build_llm_prompt(topic: "TechTopic", repo_summary: str) -> str:
         parts.append(f"적용 대상(외부 예시): {topic.digest_target_scope[:300]}")
     if topic.digest_category:
         parts.append(f"카테고리: {topic.digest_category}")
+    # PR-SU-11 — medium-digest-agent 가 제공하는 한국어 의미 해석을 LLM 컨텍스트로 첨부.
+    # 영어 제목을 가공한 결과라 게이트 LLM 이 적합성 판단을 정확히 한다.
+    if topic.interpretation_core:
+        parts.append(f"핵심 메시지: {topic.interpretation_core}")
+    if topic.interpretation_why:
+        parts.append(f"왜 화제: {topic.interpretation_why}")
+    if topic.interpretation_takeaways:
+        parts.append("Take-away: " + " / ".join(topic.interpretation_takeaways[:3]))
+    if topic.importance_score is not None:
+        parts.append(f"외부 중요도(0~100): {topic.importance_score}")
     if topic.news_articles:
         parts.append("관련 뉴스:")
         for art in topic.news_articles[:3]:

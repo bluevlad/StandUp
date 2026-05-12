@@ -130,6 +130,13 @@ def _proposals_to_template_topics(
             digest_title = t.digest_title
             digest_summary = t.digest_summary
 
+        # PR-SU-11 — medium-digest v2 필드를 카드에 동봉.
+        importance_score = t.importance_score if t else None
+        importance_factors = (t.importance_factors if t else []) or []
+        interpretation_core = (t.interpretation_core if t else "") or ""
+        interpretation_why = (t.interpretation_why if t else "") or ""
+        interpretation_takeaways = (t.interpretation_takeaways if t else []) or []
+
         cards.append({
             "keyword": display_keyword,
             "priority": (None
@@ -147,6 +154,12 @@ def _proposals_to_template_topics(
             "code_hints": p.code_hints or [],
             "candidate_modules": p.candidate_modules or [],
             "risks": p.risks or [],
+            # PR-SU-11
+            "importance_score": importance_score,
+            "importance_factors": importance_factors,
+            "interpretation_core": interpretation_core,
+            "interpretation_why": interpretation_why,
+            "interpretation_takeaways": interpretation_takeaways,
         })
     return cards
 

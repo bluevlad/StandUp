@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 
 _FILENAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-(.+)\.md$")
 _LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-_BULLET_KV_RE = re.compile(r"^[-*]\s*\*\*(?P<key>[^:*]+)\*\*\s*[:：]\s*(?P<value>.+)$")
+_BULLET_KV_RE = re.compile(r"^[-*]\s*\*\*(?P<key>[^:*]+)\*\*\s*[:：]\s*(?P<value>.*)$")
 _HEADING_RE = re.compile(r"^(#{1,6})\s*(.+?)\s*$")
 
 # 섹션 별칭 — 한글 표기 흔들림 흡수용
@@ -76,6 +76,8 @@ _SECTION_ALIASES = {
     "리스크": "risks",
     "파일럿 적용 범위": "pilot_scope",
     "승인": "approval",
+    # PR-MDA-3 (medium-digest-agent) — 제목 의미 해석 섹션
+    "제목 의미 해석": "interpretation",
 }
 
 # 메타데이터 키 별칭
@@ -87,7 +89,23 @@ _META_KEY_ALIASES = {
     "우선순위": "priority",
     "도입 난이도": "difficulty",
     "기술 성숙도": "maturity",
+    # PR-MDA-2 (medium-digest-agent) — 중요도 점수
+    "중요도 점수": "importance_score",
+    "점수 근거": "importance_factors_block",
 }
+
+# PR-MDA-3 — 제목 의미 해석 섹션 내부의 sub-bullet 키
+_INTERPRETATION_KEY_ALIASES = {
+    "핵심 메시지": "core_message",
+    "왜 지금 화제인가": "why_now",
+    "왜 지금 화제": "why_now",
+    "개발자 Take-away": "takeaways_block",
+    "개발자 take-away": "takeaways_block",
+    "Take-away": "takeaways_block",
+}
+
+# "85/100" 또는 "85" 형태에서 숫자 추출
+_SCORE_RE = re.compile(r"(\d{1,3})")
 
 
 @dataclass
@@ -113,6 +131,13 @@ class DigestReport:
     risks: str = ""
     pilot_scope: str = ""
     raw_text: str = ""
+    # PR-MDA-2 (medium-digest-agent) — 중요도 점수
+    importance_score: Optional[int] = None      # 0~100
+    importance_factors: list[str] = field(default_factory=list)
+    # PR-MDA-3 (medium-digest-agent) — 제목 의미 해석
+    interpretation_core: str = ""               # 핵심 메시지
+    interpretation_why: str = ""                # 왜 지금 화제인가
+    interpretation_takeaways: list[str] = field(default_factory=list)
 
     @property
     def occurred_at(self) -> datetime:
@@ -130,18 +155,104 @@ class DigestReport:
         return (body[:240] + "…") if len(body) > 240 else body
 
 
-def _parse_summary_bullets(lines: list[str]) -> dict[str, str]:
+def _parse_summary_bullets(lines: list[str]) -> tuple[dict[str, str], list[str]]:
+    """요약 섹션 bullet 파싱.
+
+    Returns:
+      (meta_dict, importance_factors)
+      - meta_dict: _META_KEY_ALIASES 매핑 통과한 key/value
+      - importance_factors: '- 점수 근거:' 다음에 들여쓰기로 나열된 sub-bullet 목록.
+        PR-MDA-2 출력 포맷 예:
+            - **점수 근거**:
+              - 채택 가속 ...
+              - 패턴 매칭 ...
+    """
     out: dict[str, str] = {}
+    factors: list[str] = []
+    in_factors_block = False
     for line in lines:
-        m = _BULLET_KV_RE.match(line.strip())
-        if not m:
+        stripped = line.strip()
+        # 1) "- **키**: 값" 형태
+        m = _BULLET_KV_RE.match(stripped)
+        if m:
+            key = m.group("key").strip()
+            value = m.group("value").strip()
+            canonical = _META_KEY_ALIASES.get(key)
+            if canonical == "importance_factors_block":
+                in_factors_block = True
+                # 같은 줄에 값이 있다면 첫 factor 로 흡수 (희귀 케이스)
+                if value:
+                    factors.append(value)
+                continue
+            in_factors_block = False
+            if canonical:
+                out[canonical] = value
             continue
-        key = m.group("key").strip()
-        value = m.group("value").strip()
-        canonical = _META_KEY_ALIASES.get(key)
-        if canonical:
-            out[canonical] = value
-    return out
+        # 2) factors block 안에서 들여쓴 sub-bullet "  - text"
+        if in_factors_block and stripped.startswith("- "):
+            factors.append(stripped[2:].strip())
+            continue
+        # 3) 빈 줄은 block 종료 X (계속 sub-bullet 가능), 다른 형태가 오면 종료
+        if in_factors_block and stripped and not stripped.startswith("- "):
+            in_factors_block = False
+    return out, factors
+
+
+def _parse_score(raw: str) -> Optional[int]:
+    """`85/100` 또는 `85` → 85. 범위 초과는 [0,100] 으로 clamp."""
+    if not raw:
+        return None
+    m = _SCORE_RE.search(raw)
+    if not m:
+        return None
+    try:
+        n = int(m.group(1))
+    except ValueError:
+        return None
+    return max(0, min(100, n))
+
+
+def _parse_interpretation(lines: list[str]) -> tuple[str, str, list[str]]:
+    """제목 의미 해석 섹션 파싱.
+
+    PR-MDA-3 출력 포맷:
+        ## 제목 의미 해석
+        **핵심 메시지**: ...
+        **왜 지금 화제인가**: ...
+        **개발자 Take-away**:
+        - ...
+        - ...
+
+    Returns: (core_message, why_now, takeaways)
+    """
+    core_message = ""
+    why_now = ""
+    takeaways: list[str] = []
+    in_takeaways = False
+    for line in lines:
+        stripped = line.strip()
+        # **key**: value 형태 (선두에 - 가 없을 수도)
+        m = re.match(r"^[-*]?\s*\*\*(?P<key>[^*]+)\*\*\s*[:：]?\s*(?P<value>.*)$", stripped)
+        if m:
+            key = m.group("key").strip()
+            value = m.group("value").strip()
+            canonical = _INTERPRETATION_KEY_ALIASES.get(key)
+            if canonical == "core_message":
+                core_message = value
+                in_takeaways = False
+            elif canonical == "why_now":
+                why_now = value
+                in_takeaways = False
+            elif canonical == "takeaways_block":
+                in_takeaways = True
+                if value:
+                    takeaways.append(value)
+            else:
+                in_takeaways = False
+            continue
+        if in_takeaways and stripped.startswith("- "):
+            takeaways.append(stripped[2:].strip())
+    return core_message, why_now, takeaways
 
 
 def _parse_reference_links(lines: list[str]) -> list[dict[str, str]]:
@@ -209,8 +320,12 @@ def parse_report(file_path: Path) -> Optional[DigestReport]:
         return None
 
     title, sections = _split_sections(text)
-    summary_meta = _parse_summary_bullets(sections.get("summary", []))
+    summary_meta, importance_factors = _parse_summary_bullets(sections.get("summary", []))
     refs = _parse_reference_links(sections.get("references", []))
+    importance_score = _parse_score(summary_meta.get("importance_score", ""))
+    core_msg, why_now, takeaways = _parse_interpretation(
+        sections.get("interpretation", []),
+    )
 
     return DigestReport(
         file_path=file_path,
@@ -232,6 +347,11 @@ def parse_report(file_path: Path) -> Optional[DigestReport]:
         risks=_join(sections.get("risks", [])),
         pilot_scope=_join(sections.get("pilot_scope", [])),
         raw_text=text,
+        importance_score=importance_score,
+        importance_factors=importance_factors,
+        interpretation_core=core_msg,
+        interpretation_why=why_now,
+        interpretation_takeaways=takeaways,
     )
 
 
