@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ....agents_v2.hopen_tech_brief import run_daily as run_daily_hopen_tech
 from ....agents_v2.insight_newsletter import run_weekly
 from ....core.database import get_db
 from ....ingestion.hub import IngestionHub
@@ -141,3 +142,42 @@ def preview_newsletter(newsletter_id: str, db: Session = Depends(get_db)):
     if nl is None:
         raise HTTPException(404, "newsletter not found")
     return HTMLResponse(content=nl.html_body)
+
+
+# ── HopenTechBrief 일일 채널 (PR6) ───────────────────────────────────────
+
+class HopenBriefRunRequest(BaseModel):
+    dry_run: bool = False
+    window_hours: Optional[int] = None
+    skip_ingest: bool = False
+
+
+class HopenBriefRunResponse(BaseModel):
+    newsletter_id: Optional[str]
+    period: date
+    window_hours: int
+    eligible: int
+    filtered_out: int
+    sent: int
+    failed: int
+    skipped_reason: Optional[str] = None
+
+
+@router.post("/hopen-brief/run", response_model=HopenBriefRunResponse)
+def trigger_hopen_brief(req: HopenBriefRunRequest):
+    """HopenTechBrief 일일 1회 즉시 실행 (수동 트리거 / dry-run)."""
+    res = run_daily_hopen_tech(
+        dry_run=req.dry_run,
+        window_hours=req.window_hours,
+        skip_ingest=req.skip_ingest,
+    )
+    return HopenBriefRunResponse(
+        newsletter_id=res.newsletter_id,
+        period=res.period_start,
+        window_hours=res.window_hours,
+        eligible=res.eligible,
+        filtered_out=res.filtered_out,
+        sent=res.send.success if res.send else 0,
+        failed=res.send.failed if res.send else 0,
+        skipped_reason=res.skipped_reason,
+    )
