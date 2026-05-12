@@ -113,6 +113,42 @@ class Settings(BaseSettings):
         default=3, env="TECH_TREND_MAX_TOPICS_PER_RUN",
     )
 
+    # ── HopenVision-Tight (PR4) — 적합도 필터 + repo index ───────────────────
+    hopenvision_repo_path: str = Field(
+        default="", env="HOPENVISION_REPO_PATH",
+    )  # 예: /Users/rainend/GIT/hopenvision
+    hopenvision_stack_tags: str = Field(
+        default="java,spring,spring-boot,react,postgresql,typescript,jpa,jwt,docker",
+        env="HOPENVISION_STACK_TAGS",
+    )  # 콤마 구분 — 토픽 텍스트와 매칭할 HopenVision 스택 태그
+    hopen_brief_fitness_threshold: int = Field(
+        default=60, env="HOPEN_BRIEF_FITNESS_THRESHOLD",
+    )  # 0~100. 미달 토픽은 LLM 제안 생성 skip.
+    hopen_repo_index_ttl_hours: int = Field(
+        default=24, env="HOPEN_REPO_INDEX_TTL_HOURS",
+    )
+
+    # ── HopenTechBrief 일일 채널 (PR6) ────────────────────────────────────
+    hopen_brief_daily_enabled: bool = Field(
+        default=False, env="HOPEN_BRIEF_DAILY_ENABLED",
+    )
+    hopen_brief_daily_hour: int = Field(default=9, env="HOPEN_BRIEF_DAILY_HOUR")
+    hopen_brief_daily_minute: int = Field(default=0, env="HOPEN_BRIEF_DAILY_MINUTE")
+    hopen_brief_window_hours: int = Field(
+        default=24, env="HOPEN_BRIEF_WINDOW_HOURS",
+    )
+    hopen_brief_max_per_day: int = Field(
+        default=3, env="HOPEN_BRIEF_MAX_PER_DAY",
+    )
+    hopen_brief_subject_prefix: str = Field(
+        default="[HopenTechBrief]", env="HOPEN_BRIEF_SUBJECT_PREFIX",
+    )
+    # 주간 newsletter 의 tech 섹션 게이트 — 스택 매칭만(0~60), LLM 호출 없음.
+    # 일일과 달리 *얕은* 게이트라 더 관대하게 통과 (스택 1개 매칭=25점이면 통과).
+    weekly_tech_stack_min_score: int = Field(
+        default=25, env="WEEKLY_TECH_STACK_MIN_SCORE",
+    )
+
     # Naver News API (선택 — 미설정 시 Google News RSS 만 사용)
     naver_client_id: str = Field(default="", env="NAVER_CLIENT_ID")
     naver_client_secret: str = Field(default="", env="NAVER_CLIENT_SECRET")

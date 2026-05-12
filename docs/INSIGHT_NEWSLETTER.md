@@ -157,6 +157,140 @@ LLM 호출 실패 시: synthesis 가 raw 데이터로 fallback 본문 생성 →
 - HopenVision 제안 캐시는 `cluster_key=tech:<slug>` 로 클러스터 기반 제안과 분리
 - 대시보드 `/dashboard/insights` 의 ④번 섹션에서 자동 생성된 제안 + DevPlan 링크 확인
 
+## HopenVision-Tight 게이트 (PR4)
+
+PR3 까지는 `tech_trend_keywords` 매칭만 통과하면 모든 토픽이 LLM 제안 → DevPlan 초안화
+경로를 탔다. 이 때문에 Autonomous-QA-Agent / Unity / 머신비전 같이 HopenVision 과
+무관한 토픽도 제안 큐에 올라와 범위가 너무 확장되었다.
+
+PR4 부터는 토픽 → 제안 사이에 **HopenVision 적합도 게이트**가 추가된다.
+
+```
+TechTopic (키워드+디지스트+뉴스)
+   ↓ stack 키워드 매칭 (0~60점, 결정적)
+   ↓ LLM 분류 (0~40점, 모델=qwen2.5-coder)
+   ↓ score >= HOPEN_BRIEF_FITNESS_THRESHOLD ?
+   ├─ Yes → HopenVisionProposalService 로 진입, repo index 와 fitness 결과를
+   │         프롬프트에 동봉. proposal 행에 fitness_score/impact_area/effort_hours 저장.
+   └─ No  → filtered_out 으로 표시 (DB 저장 X, 로그에만 남김)
+```
+
+핵심 입력은 **로컬 hopenvision clone** 의 트리 인덱스:
+- Spring `@RestController` / `@Entity` / `@Service` 클래스 + 패키지 + 라우트
+- `web-admin/web-user/web-shared` 의 페이지 컴포넌트 목록
+
+인덱스는 `BASE_DIR/.cache/hopenvision_repo_index.json` 에 24h TTL 로 캐시.
+LLM 프롬프트에 `condense_for_prompt(idx)` 결과가 들어가 모델이 *실제 모듈명* 으로
+candidate_modules 를 제안하게 한다.
+
+| Key | 기본값 | 설명 |
+|-----|-------|------|
+| `HOPENVISION_REPO_PATH` | `""` | HopenVision 로컬 clone 경로 (미설정 시 게이트는 stack 매칭만으로 동작) |
+| `HOPENVISION_STACK_TAGS` | `java,spring,spring-boot,react,postgresql,typescript,jpa,jwt,docker` | 토픽 텍스트와 매칭할 스택 태그 |
+| `HOPEN_BRIEF_FITNESS_THRESHOLD` | `60` | 0~100. 미달 토픽은 LLM 제안 생성 skip |
+| `HOPEN_REPO_INDEX_TTL_HOURS` | `24` | repo index 캐시 TTL |
+
+운영 메모:
+- 1회 실행에 LLM 호출이 (토픽당 게이트 1회 + 제안 1회) 발생 — 게이트 모델은
+  `OLLAMA_MODEL_ANALYZE` (기본 qwen2.5-coder:14b), 제안 모델은 `OLLAMA_MODEL_COMPOSE`.
+  스택 매칭이 0 인 토픽은 게이트 LLM 호출도 skip 되므로 비용 가드.
+- `HopenVisionProposal.fitness_score / impact_area / effort_hours` 컬럼이 추가됨
+  — 대시보드에서 "참고 보관" 탭 / 제안 정렬에 활용 (PR5 에서 UI 노출).
+- 게이트를 끄려면 `HOPEN_BRIEF_FITNESS_THRESHOLD=0` 으로 설정 (PR3 동작 복원).
+
+## 상세 산출물 (PR5) — Mermaid · 적용 사례 · PoC 코드 힌트
+
+PR4 의 적합도 게이트를 통과한 토픽에 대해 *카드형 메일 한 토픽 = 한 페이지* 수준의
+상세 산출물을 추가로 생성한다. 모든 결과는 `hopenvision_proposals` 행에 함께 저장.
+
+`app/synthesis/tech_brief_detailer.py` 가 세 단계를 묶어 호출:
+
+| 단계 | 산출물 | 모델/외부 호출 |
+|------|--------|----------------|
+| 1) Mermaid 다이어그램 | `diagram_mermaid` (As-Is / To-Be subgraph 형식) | `OLLAMA_MODEL_ANALYZE` |
+| 2) 적용 사례 | `case_studies` (`title/url/image_url/description/site_name/source`) | 뉴스 article URL 에서 og:image / canonical 추출 (`article_image_extractor`) |
+| 3) PoC 코드 힌트 | `code_hints` (`file/change_sketch/snippet`) | `OLLAMA_MODEL_ANALYZE` — repo index 파일 경로 외 항목은 ⚠ 표시 |
+
+각 단계는 독립 try/except — 한 단계가 실패해도 다른 산출물은 정상 저장된다.
+`enable_detail=False` 로 호출하면 detailer 자체를 skip (테스트·디버그용).
+
+새 메일 템플릿 `app/templates/hopen_tech_brief.html` 가 토픽 1~3 건을 카드로 표현:
+- 적합도 / 예상공수 배지, priority / impact_area 배지
+- Mermaid 코드블록 + `mermaid.live` 링크 (Gmail 에서 직접 렌더는 미지원, 코드 복붙으로 시각화)
+- 사례 카드 (썸네일 + 제목 + 사이트명 + 짧은 설명)
+- 코드 힌트 (실파일 경로 + 변경 스케치 + 옵션 snippet)
+
+PR6 에서 일일 cron 으로 이 템플릿을 호출하는 별도 `[HopenTechBrief]` 메일 채널 추가 예정.
+
+## 일일 [HopenTechBrief] 채널 (PR6)
+
+PR4(게이트) + PR5(detailer) 를 *일일 케이던스* 로 운영하는 별도 메일 채널. 주간
+Insight Newsletter 와 다음과 같이 분리되어 공존한다.
+
+| 항목 | 주간 Insight | **일일 HopenTechBrief** |
+|------|--------------|-------------------------|
+| 스케줄 | 월요일 09:00 KST | 매일 09:00 KST |
+| 윈도우 | 최근 7일 | 최근 24h (env 조정) |
+| 합성 | exaone3.5 cascade 풀세트 | tech_topics 추출만 |
+| tech 게이트 | 스택 매칭만 (≥25, 무관 토픽 컷) | 스택+LLM 합산 (≥60, 깊이있게) |
+| 메일 채널 | `report_types LIKE '%insight%'` | `report_types LIKE '%hopen_tech%'` |
+| 토픽 깊이 | 키워드 + 디지스트 hint | + Mermaid + 사례 + PoC 힌트 |
+| 빈 결과 시 | 항상 발송 | 통과 0건이면 발송 skip |
+
+```
+[CRON 09:00 KST]
+  ↓
+IngestionHub (24h 윈도우)
+  ↓
+_collect_tech_topics (medium_digest_report + tech_news_article)
+  ↓
+propose_from_tech_topics
+  ↓ (게이트 통과 토픽 ≥1)
+render_hopen_tech_brief (hopen_tech_brief.html)
+  ↓
+send_hopen_tech_brief (hopen_tech 채널 수신자)
+```
+
+핵심 환경변수 (PR6):
+
+| Key | 기본값 | 설명 |
+|-----|--------|------|
+| `HOPEN_BRIEF_DAILY_ENABLED` | `false` | 일일 cron 활성화 |
+| `HOPEN_BRIEF_DAILY_HOUR` / `_MINUTE` | `9` / `0` | KST 발송 시각 |
+| `HOPEN_BRIEF_WINDOW_HOURS` | `24` | 윈도우 시간 |
+| `HOPEN_BRIEF_MAX_PER_DAY` | `3` | 카드로 표현할 최대 토픽 수 (LLM·fetch 비용 가드) |
+| `HOPEN_BRIEF_SUBJECT_PREFIX` | `[HopenTechBrief]` | 메일 제목 prefix |
+| `WEEKLY_TECH_STACK_MIN_SCORE` | `25` | 주간 newsletter tech 섹션 게이트 (스택만) |
+
+수동 트리거:
+
+```bash
+# 실제 발송
+curl -X POST http://localhost:9060/api/v1/insight/hopen-brief/run \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": false}'
+
+# dry-run (DB 행은 저장, 메일 미발송)
+curl -X POST http://localhost:9060/api/v1/insight/hopen-brief/run \
+  -H "Content-Type: application/json" \
+  -d '{"dry_run": true, "window_hours": 48}'
+```
+
+수신자 등록:
+
+```sql
+INSERT INTO recipients (name, email, report_types, is_active)
+VALUES ('홍길동', 'a@b.com', 'hopen_tech', true);
+
+-- 기존 수신자에 추가
+UPDATE recipients SET report_types = 'insight,hopen_tech' WHERE email = 'a@b.com';
+```
+
+운영 메모:
+- 같은 `newsletters` 테이블을 재사용 — `synthesis_meta.channel='hopen_tech'` 로 구분, 일일은 `period_start == period_end`.
+- 통과 토픽 0건이면 newsletter row 도 생성하지 않고 빠르게 종료 (`skipped_reason='no_eligible_topics'`).
+- `propose_from_tech_topics` 의 LLM 호출은 토픽당 1~3 회 (게이트 LLM + proposal LLM + detailer 2회). 1일 3토픽 가정 시 최대 12회 LLM 호출.
+
 ## 향후 확장
 
 1. **자동 효과 검증** (`docs/AGENT_DATA_CONTRACT.md` 참고) — fix 후 재발 여부 자동 라벨
