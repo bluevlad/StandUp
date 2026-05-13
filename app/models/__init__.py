@@ -11,6 +11,10 @@ from .insight import (
     COLLECTION_QA, COLLECTION_LOGS, COLLECTION_FIXES, COLLECTION_NEWSLETTERS,
     SOURCE_LOGANALYZER, SOURCE_GITHUB_QA, SOURCE_AUTO_TOBE_JOURNAL, SOURCE_AUTO_TOBE_COMMIT,
 )
+from .session_log import (
+    ClaudeSession, SessionItem, SessionPending, SessionCommit,
+    SessionSource, PendingStatus,
+)
 
 __all__ = [
     "WorkItem", "Report", "ReportItem", "AgentLog",
@@ -20,4 +24,6 @@ __all__ = [
     "COLLECTION_QA", "COLLECTION_LOGS", "COLLECTION_FIXES", "COLLECTION_NEWSLETTERS",
     "SOURCE_LOGANALYZER", "SOURCE_GITHUB_QA",
     "SOURCE_AUTO_TOBE_JOURNAL", "SOURCE_AUTO_TOBE_COMMIT",
+    "ClaudeSession", "SessionItem", "SessionPending", "SessionCommit",
+    "SessionSource", "PendingStatus",
 ]
