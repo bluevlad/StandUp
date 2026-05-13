@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - {{ session.document_no }}{% endblock %}
+{% block page_title %}{{ session.document_no or session.session_id[:8] }}{% endblock %}
+{% block page_meta %}{{ session.project_name }} · {{ session.started_at.strftime('%Y-%m-%d %H:%M') }} ~ {{ session.ended_at.strftime('%H:%M') }} · {{ session.duration_min }}분{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:16px;">
+    <h3>회의록</h3>
+    <table style="margin-top:8px;">
+        <tr><th style="width:140px;">주제 및 안건</th><td>{{ session.topic }}</td></tr>
+        <tr><th>문서번호</th><td>{{ session.document_no or '—' }}</td></tr>
+        <tr><th>일시</th><td>{{ session.started_at.strftime('%Y-%m-%d %H:%M:%S') }} ~ {{ session.ended_at.strftime('%Y-%m-%d %H:%M:%S') }}</td></tr>
+        <tr><th>프로젝트 / 브랜치</th><td>{{ session.project_name }} / {{ session.git_branch or '—' }}</td></tr>
+        <tr><th>source</th><td><span class="badge">{{ session.source.value }}</span></td></tr>
+        <tr><th>메시지 / tool_use</th><td>{{ session.message_count }} msgs</td></tr>
+    </table>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+    <h3>회의 내용 ({{ session.items | length }})</h3>
+    {% if session.items %}
+    <ol style="padding-left:24px; line-height:1.7;">
+        {% for item in session.items %}
+        <li>
+            <strong>{{ item.title }}</strong>
+            {% if item.content %}<div style="color:#64748b; font-size:13px; margin-top:2px;">{{ item.content }}</div>{% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+    {% else %}
+    <p style="color:#64748b;">항목이 없습니다.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+    <h3>미결사항 ({{ session.pending | length }})</h3>
+    {% if session.pending %}
+    <table>
+        <thead>
+            <tr><th>내용</th><th>상태</th><th>work_item</th><th style="width:240px;">동작</th></tr>
+        </thead>
+        <tbody>
+            {% for p in session.pending %}
+            <tr id="pending-{{ p.id }}">
+                <td>{{ p.content }}</td>
+                <td><span class="badge badge-st-{{ p.status.value }}">{{ p.status.value }}</span></td>
+                <td>{% if p.work_item_id %}#{{ p.work_item_id }}{% else %}—{% endif %}</td>
+                <td>
+                    {% if p.status == PendingStatus.OPEN %}
+                    <button class="btn btn-primary" onclick="approvePending({{ session.id }}, {{ p.id }})">work_items 등록</button>
+                    <button class="btn btn-secondary" onclick="dismissPending({{ session.id }}, {{ p.id }})">거절</button>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#64748b;">미결사항이 없습니다.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+    <h3>세션 기간 커밋 ({{ session.commits | length }})</h3>
+    {% if session.commits %}
+    <table>
+        <thead>
+            <tr><th>SHA</th><th>커밋 메시지</th><th>일시</th></tr>
+        </thead>
+        <tbody>
+            {% for c in session.commits %}
+            <tr>
+                <td><code>{{ c.commit_sha[:8] }}</code></td>
+                <td>{{ c.commit_message }}</td>
+                <td>{% if c.committed_at %}{{ c.committed_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#64748b;">관련 커밋이 없습니다.</p>
+    {% endif %}
+</div>
+
+{% if session.summary_md %}
+<div class="card">
+    <h3>회의록 원문 (Markdown)</h3>
+    <pre style="white-space:pre-wrap; background:#0f172a; color:#e2e8f0; padding:14px; border-radius:6px; font-family:'Menlo','Consolas',monospace; font-size:12.5px; line-height:1.6;">{{ session.summary_md }}</pre>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function approvePending(sessionId, pendingId) {
+    if (!confirm('이 미결사항을 work_items 로 등록하시겠습니까?')) return;
+    const res = await fetch('{{ base_path }}/api/v1/claude-sessions/' + sessionId + '/pending/' + pendingId + '/approve', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({category: 'required'}),
+    });
+    if (!res.ok) { alert('실패: ' + res.status); return; }
+    location.reload();
+}
+async function dismissPending(sessionId, pendingId) {
+    if (!confirm('이 미결사항을 거절(무시)하시겠습니까?')) return;
+    const res = await fetch('{{ base_path }}/api/v1/claude-sessions/' + sessionId + '/pending/' + pendingId + '/dismiss', {
+        method: 'POST',
+    });
+    if (!res.ok) { alert('실패: ' + res.status); return; }
+    location.reload();
+}
+</script>
+{% endblock %}
