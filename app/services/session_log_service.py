@@ -21,6 +21,7 @@ from ..models.session_log import (
     SessionSource, PendingStatus,
 )
 from ..models.issue import WorkItem, ItemCategory, ItemStatus
+from .session_summarizer import summarize_session
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ def parse_transcript(jsonl_path: Path) -> dict | None:
     first_user_msg = None
     user_msg_count = assistant_msg_count = tool_use_count = 0
     pending_candidates: list[str] = []
+    user_messages: list[str] = []
 
     for event in _iter_transcript(jsonl_path):
         ts = _parse_iso(event.get("timestamp", ""))
@@ -107,6 +109,8 @@ def parse_transcript(jsonl_path: Path) -> dict | None:
             text = _extract_text(event.get("message"))
             if first_user_msg is None and text:
                 first_user_msg = text
+            if text:
+                user_messages.append(text)
             for kw in PENDING_KEYWORDS:
                 if kw in text:
                     for line in text.splitlines():
@@ -134,6 +138,7 @@ def parse_transcript(jsonl_path: Path) -> dict | None:
         "cwd": cwd,
         "git_branch": git_branch,
         "first_user_msg": first_user_msg or "(no user message)",
+        "user_messages": user_messages,
         "user_msg_count": user_msg_count,
         "assistant_msg_count": assistant_msg_count,
         "tool_use_count": tool_use_count,
@@ -182,6 +187,33 @@ def collect_commits(repo_path: Path, since: datetime, until: datetime) -> list[d
 
 def should_register(parsed: dict, commits: list[dict]) -> bool:
     return parsed["duration_min"] >= MIN_DURATION_MIN or len(commits) >= MIN_COMMITS
+
+
+def _render_summary_md(
+    topic: str,
+    started_at: datetime,
+    ended_at: datetime,
+    items: list[tuple[int, str, str]],
+    pending: list[str],
+) -> str:
+    lines = [
+        "-회 의 록-",
+        "",
+        f"-주제 및 안건 : {topic}",
+        f"-일시 : {started_at.isoformat()} ~ {ended_at.isoformat()}",
+        "-회의 내용 :",
+    ]
+    for seq, title, content in items:
+        lines.append(f"   {seq}. {title}")
+        if content:
+            lines.append(f"      {content}")
+    lines.append("-미결사항 :")
+    if pending:
+        for p in pending:
+            lines.append(f"   - {p}")
+    else:
+        lines.append("   - (없음)")
+    return "\n".join(lines)
 
 
 def build_summary(parsed: dict, commits: list[dict]) -> tuple[str, list[tuple[int, str, str]]]:
@@ -356,12 +388,46 @@ class SessionLogService:
                 "document_no": existing.document_no,
             }
 
+        # 1) Rule-based 베이스라인
         summary_md, items = build_summary(parsed, commits)
+        topic = parsed["first_user_msg"].split("\n", 1)[0][:480]
+        pending_list = list(parsed["pending_candidates"])
+        llm_used = False
+
+        # 2) LLM 보강 (실패 시 베이스라인 유지)
+        llm_out = summarize_session(parsed, commits, parsed.get("user_messages", []))
+        if llm_out:
+            llm_used = True
+            if llm_out.get("topic"):
+                topic = llm_out["topic"][:480]
+            if llm_out.get("items"):
+                items = [
+                    (i + 1, it["title"], it.get("content") or "")
+                    for i, it in enumerate(llm_out["items"])
+                ]
+            # pending 은 LLM 결과 + rule-based 결합 (중복 제거)
+            seen: set[str] = set()
+            merged_pending: list[str] = []
+            for p in (llm_out.get("pending") or []) + pending_list:
+                key = p.strip().lower()
+                if key and key not in seen:
+                    seen.add(key)
+                    merged_pending.append(p.strip())
+            pending_list = merged_pending
+
+            # 회의록 본문 재생성 (LLM 결과 반영)
+            summary_md = _render_summary_md(
+                topic=topic,
+                started_at=parsed["started_at"],
+                ended_at=parsed["ended_at"],
+                items=items,
+                pending=pending_list,
+            )
 
         if dry_run:
             return {
                 "status": "registered",
-                "message": "(dry-run) would register",
+                "message": "(dry-run) would register" + (" (LLM)" if llm_used else " (rule)"),
                 "document_no": None,
             }
 
@@ -371,12 +437,12 @@ class SessionLogService:
             project_name=project,
             cwd=parsed["cwd"],
             git_branch=parsed["git_branch"],
-            topic=parsed["first_user_msg"].split("\n", 1)[0][:480],
+            topic=topic,
             document_no=document_no,
             started_at=parsed["started_at"].replace(tzinfo=None),
             ended_at=parsed["ended_at"].replace(tzinfo=None),
             summary_md=summary_md,
-            source=source,
+            source=SessionSource.HYBRID if llm_used else source,
             duration_min=parsed["duration_min"],
             commit_count=len(commits),
             message_count=parsed["user_msg_count"] + parsed["assistant_msg_count"],
@@ -386,7 +452,7 @@ class SessionLogService:
 
         for seq, title, content in items:
             db.add(SessionItem(session_id=session.id, seq=seq, title=title, content=content))
-        for p in parsed["pending_candidates"]:
+        for p in pending_list:
             db.add(SessionPending(session_id=session.id, content=p))
         for c in commits:
             db.add(SessionCommit(
@@ -402,7 +468,8 @@ class SessionLogService:
             "status": "registered",
             "message": (
                 f"id={session.id} items={len(items)} "
-                f"pending={len(parsed['pending_candidates'])} commits={len(commits)}"
+                f"pending={len(pending_list)} commits={len(commits)}"
+                + (" (LLM)" if llm_used else " (rule)")
             ),
             "session_id": session.id,
             "document_no": document_no,

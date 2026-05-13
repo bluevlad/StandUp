@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     ollama_embed_dim: int = Field(default=768, env="OLLAMA_EMBED_DIM")
     ollama_timeout_sec: int = Field(default=600, env="OLLAMA_TIMEOUT_SEC")
 
+    # Claude 세션 회의록 — LLM 요약 (Phase 3)
+    session_log_llm_enabled: bool = Field(default=True, env="SESSION_LOG_LLM_ENABLED")
+    session_log_summary_model: str = Field(default="qwen2.5:7b", env="SESSION_LOG_SUMMARY_MODEL")
+    session_log_llm_timeout_sec: int = Field(default=120, env="SESSION_LOG_LLM_TIMEOUT_SEC")
+
     # Insight 스케줄 (월요일 09:00)
     insight_weekly_dow: str = Field(default="mon", env="INSIGHT_WEEKLY_DOW")
     insight_weekly_hour: int = Field(default=9, env="INSIGHT_WEEKLY_HOUR")
