@@ -7,9 +7,15 @@ ENV TZ=Asia/Seoul
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # System dependencies
+# - libpq-dev: PostgreSQL client lib for psycopg2
+# - git: claude-sessions ingest 가 마운트된 호스트 GIT 디렉토리에서 git log 호출
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# Mounted host dirs 는 다른 UID 로 보이므로 git 의 dubious ownership 경고 우회
+RUN git config --system --add safe.directory '*'
 
 # Python dependencies
 COPY requirements.txt .

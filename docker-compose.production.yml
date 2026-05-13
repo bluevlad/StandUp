@@ -18,6 +18,11 @@ services:
       # / HOPENVISION_REPO_PATH 와 1:1 매칭.
       - /Users/rainend/GIT/medium-digest-agent/reports:/data/medium-digest:ro
       - /Users/rainend/GIT/hopenvision:/data/hopenvision:ro
+      # Claude 세션 transcript + 커밋 매핑 (Phase 2~3 claude-sessions ingest)
+      # transcript 의 cwd 가 /Users/rainend/GIT/... 절대경로이므로
+      # 컨테이너 안에서도 동일 경로로 보이도록 매핑한다.
+      - /Users/rainend/.claude/projects:/root/.claude/projects:ro
+      - /Users/rainend/GIT:/Users/rainend/GIT:ro
     restart: always
     networks:
       - app-network
