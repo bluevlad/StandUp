@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}StandUp - Claude Sessions{% endblock %}
+{% block page_title %}Claude 세션 회의록{% endblock %}
+{% block page_meta %}프로젝트별 세션 ({{ total }}건){% endblock %}
+
+{% block content %}
+<div class="filter-bar">
+    <div class="filter-group">
+        <label>프로젝트</label>
+        <input type="text" id="filter-project" value="{{ current_project }}"
+               placeholder="예: StandUp"
+               onkeydown="if(event.key==='Enter')applyFilters()">
+    </div>
+    <div class="filter-group" style="align-self:flex-end;">
+        <button onclick="applyFilters()" class="btn btn-primary">조회</button>
+        <button onclick="resetFilters()" class="btn btn-secondary">초기화</button>
+    </div>
+</div>
+
+<div class="card">
+    {% if sessions %}
+    <table>
+        <thead>
+            <tr>
+                <th>문서번호</th>
+                <th>프로젝트</th>
+                <th>주제 및 안건</th>
+                <th>일시</th>
+                <th>소요</th>
+                <th>커밋</th>
+                <th>미결</th>
+                <th>source</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in sessions %}
+            <tr>
+                <td><a href="{{ base_path }}/dashboard/sessions/{{ s.id }}" class="item-link">{{ s.document_no or s.session_id[:8] }}</a></td>
+                <td>{{ s.project_name }}</td>
+                <td><a href="{{ base_path }}/dashboard/sessions/{{ s.id }}" class="item-link">{{ s.topic[:80] }}</a></td>
+                <td>{{ s.started_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>{{ s.duration_min }}분</td>
+                <td>{{ s.commit_count }}</td>
+                <td>
+                    {% if s.pending_open_count > 0 %}
+                    <span class="badge badge-st-open">{{ s.pending_open_count }}</span>
+                    {% else %}—{% endif %}
+                </td>
+                <td><span class="badge">{{ s.source.value }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="padding:24px; text-align:center; color:#64748b;">등록된 세션이 없습니다.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function applyFilters() {
+    var p = document.getElementById('filter-project').value.trim();
+    var qs = p ? ('?project_name=' + encodeURIComponent(p)) : '';
+    location.href = '{{ base_path }}/dashboard/sessions' + qs;
+}
+function resetFilters() {
+    location.href = '{{ base_path }}/dashboard/sessions';
+}
+</script>
+{% endblock %}

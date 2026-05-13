@@ -17,7 +17,9 @@ from ....models.insight import Newsletter, IngestionEvent
 from ....services.report_service import get_report_service
 from ....services.stats_service import get_stats_service
 from ....services.dev_plan_service import get_dev_plan_service
+from ....services.session_log_service import get_session_log_service
 from ....models.dev_plan import DevPlan, PlanStatus, PlanItemStatus
+from ....models.session_log import PendingStatus
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -572,3 +574,44 @@ def insights_hopenvision_accept(proposal_id: str, db: Session = Depends(get_db))
         f'#{plan.id} {plan.title}</a></div>'
     )
     return HTMLResponse(content=html)
+
+
+# =====================================================================
+# Claude 세션 회의록
+# =====================================================================
+
+@router.get("/sessions", response_class=HTMLResponse)
+def sessions_list(
+    project_name: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    service = get_session_log_service()
+    sessions = service.list_sessions(
+        db, project_name=project_name, limit=limit, offset=offset
+    )
+    total = service.count_sessions(db, project_name=project_name)
+    return _render(
+        "sessions_list.html",
+        sessions=sessions,
+        total=total,
+        current_project=project_name or "",
+        limit=limit,
+        offset=offset,
+        active_page="sessions",
+    )
+
+
+@router.get("/sessions/{session_pk}", response_class=HTMLResponse)
+def sessions_detail(session_pk: int, db: Session = Depends(get_db)):
+    service = get_session_log_service()
+    session = service.get_session_detail(db, session_pk)
+    if not session:
+        return HTMLResponse(content="<h1>세션을 찾을 수 없습니다</h1>", status_code=404)
+    return _render(
+        "sessions_detail.html",
+        session=session,
+        PendingStatus=PendingStatus,
+        active_page="sessions",
+    )
