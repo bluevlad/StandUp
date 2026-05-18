@@ -39,6 +39,9 @@ jobs:
           TECH_TREND_KEYWORDS: ${{ vars.TECH_TREND_KEYWORDS }}
           HOPEN_BRIEF_DAILY_ENABLED: ${{ vars.HOPEN_BRIEF_DAILY_ENABLED }}
           HOPEN_BRIEF_FITNESS_THRESHOLD: ${{ vars.HOPEN_BRIEF_FITNESS_THRESHOLD }}
+          # Phase 2b — LLMOps 보고 (standup-weekly-newsletter consumer)
+          LLMOPS_URL: ${{ vars.LLMOPS_URL }}
+          LLMOPS_API_KEY: ${{ secrets.LLMOPS_API_KEY }}
         run: |
           cat > .env.production << EOF
           DATABASE_URL=${DATABASE_URL}
@@ -66,6 +69,10 @@ jobs:
           # 일일 [HopenTechBrief] cron — vars 로 즉시 ON/OFF (PR8 에서 true 로 전환 예정).
           HOPEN_BRIEF_DAILY_ENABLED=${HOPEN_BRIEF_DAILY_ENABLED:-false}
           HOPEN_BRIEF_FITNESS_THRESHOLD=${HOPEN_BRIEF_FITNESS_THRESHOLD:-60}
+
+          # ── Phase 2b — LLMOps 보고 ───────────────────────────────────────
+          LLMOPS_URL=${LLMOPS_URL}
+          LLMOPS_API_KEY=${LLMOPS_API_KEY}
           EOF
 
       - name: Run deploy script
