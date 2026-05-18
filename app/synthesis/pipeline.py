@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
@@ -23,6 +24,7 @@ from ..models.insight import (
     COLLECTION_TECH, IngestionEvent, SOURCE_LOGANALYZER,
     SOURCE_MEDIUM_DIGEST_REPORT, SOURCE_TECH_NEWS_ARTICLE,
 )
+from ..observability.llmops import LLMOpsClient, StageReport
 from ..rag.retriever import retrieve, RetrievedChunk
 from .ollama_client import chat
 from .prompts import (
@@ -32,6 +34,9 @@ from .prompts import (
 )
 
 logger = logging.getLogger(__name__)
+
+# LLMOps 보고용 클라이언트 (모듈 싱글톤). LLMOPS_API_KEY 부재 시 no-op.
+_LLMOPS = LLMOpsClient(consumer_id="standup-weekly-newsletter")
 
 
 @dataclass
@@ -404,6 +409,10 @@ def synthesize(
     if own_session:
         session = SessionLocal()
 
+    # LLMOps 보고용 식별자 (cascade 1 회 = batch_run 1 건)
+    llmops_started_at = datetime.now(timezone.utc)
+    llmops_run_id = f"{llmops_started_at.isoformat()}-{os.getpid()}"
+
     try:
         start_dt = datetime.combine(period_start, datetime.min.time(), tzinfo=timezone.utc)
         end_dt = datetime.combine(period_end + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc)
@@ -468,7 +477,7 @@ def synthesize(
         tech_topics = _collect_tech_topics(events)
         meta["tech_topic_count"] = len(tech_topics)
 
-        return SynthesisOutput(
+        result = SynthesisOutput(
             period_start=period_start,
             period_end=period_end,
             headline=_extract_headline(markdown),
@@ -488,6 +497,40 @@ def synthesize(
             tech_topics=tech_topics,
             meta=meta,
         )
+
+        # LLMOps 보고 (성공) — fire-and-forget, 실패해도 본 함수 영향 없음
+        _LLMOPS.report(
+            run_id=llmops_run_id,
+            started_at=llmops_started_at,
+            ended_at=datetime.now(timezone.utc),
+            status="success",
+            stages=[
+                StageReport(name="summarize", model=settings.ollama_model_summarize,
+                            duration_ms=meta.get("stage1_ms")),
+                StageReport(name="analyze", model=settings.ollama_model_analyze,
+                            duration_ms=meta.get("stage2_ms")),
+                StageReport(name="compose", model=settings.ollama_model_compose,
+                            duration_ms=meta.get("stage3_ms")),
+            ],
+            metrics={
+                "event_count": meta.get("event_count", 0),
+                "tech_topic_count": meta.get("tech_topic_count", 0),
+                "summaries_count": len(summaries),
+                "rag_ref_count": len(rag_refs),
+                "markdown_len": len(markdown),
+            },
+        )
+        return result
+    except Exception as exc:
+        # 실패도 보고 (단, raise 는 그대로)
+        _LLMOPS.report(
+            run_id=llmops_run_id,
+            started_at=llmops_started_at,
+            ended_at=datetime.now(timezone.utc),
+            status="failure",
+            error={"type": type(exc).__name__, "message": str(exc)[:500]},
+        )
+        raise
     finally:
         if own_session:
             session.close()
