@@ -43,7 +43,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any, Iterable
 
-__all__ = ["LLMOpsClient", "StageReport", "report_batch_run"]
+__all__ = ["LLMOpsClient", "StageReport", "flush_pending", "report_batch_run"]
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,10 @@ DEFAULT_URL = os.environ.get(
     "LLMOPS_URL", "http://host.docker.internal:9110/api/batch-runs"
 )
 DEFAULT_TIMEOUT = 1.0  # 표준: ≤ 1초
+
+# pending fire-and-forget threads 추적 — 짧게 끝나는 process 에서 flush() 로 join 가능.
+_PENDING_THREADS: set[threading.Thread] = set()
+_PENDING_LOCK = threading.Lock()
 
 
 @dataclass
@@ -95,7 +99,7 @@ def _send(
     payload: bytes,
     timeout: float,
 ) -> None:
-    """단일 전송. 절대 예외 throw 안 함."""
+    """단일 전송. 절대 예외 throw 안 함. 종료 시 자기 자신을 _PENDING_THREADS 에서 제거."""
     try:
         req = urllib.request.Request(
             url,
@@ -114,6 +118,34 @@ def _send(
         logger.debug("LLMOps HTTP %s: %s", e.code, e.reason)
     except Exception as e:  # noqa: BLE001 — fire-and-forget 원칙
         logger.debug("LLMOps send swallowed: %s", e)
+    finally:
+        with _PENDING_LOCK:
+            _PENDING_THREADS.discard(threading.current_thread())
+
+
+def flush_pending(timeout: float = 2.0) -> int:
+    """진행 중인 fire-and-forget threads 가 끝날 때까지 wait.
+
+    짧은 lifetime 의 process (배치 잡 등) 종료 직전 호출. 정기 cron 으로 상주
+    프로세스 안에서 도는 잡은 호출 불필요 (daemon thread 가 자연스럽게 완료).
+
+    Returns: 시간 내 완료된 thread 수.
+    """
+    with _PENDING_LOCK:
+        pending = list(_PENDING_THREADS)
+    if not pending:
+        return 0
+    deadline = None
+    if timeout > 0:
+        import time as _time
+        deadline = _time.monotonic() + timeout
+    done = 0
+    for t in pending:
+        remain = None if deadline is None else max(0.0, deadline - _time.monotonic())
+        t.join(timeout=remain)
+        if not t.is_alive():
+            done += 1
+    return done
 
 
 class LLMOpsClient:
@@ -171,11 +203,19 @@ class LLMOpsClient:
             extra=extra,
         ).to_json()
 
-        threading.Thread(
+        t = threading.Thread(
             target=_send,
             args=(self.url, self.api_key, self.consumer_id, payload, self.timeout),
             daemon=True,
-        ).start()
+        )
+        with _PENDING_LOCK:
+            _PENDING_THREADS.add(t)
+        t.start()
+
+    @staticmethod
+    def flush(timeout: float = 2.0) -> int:
+        """편의용 — 모듈 함수 flush_pending() 과 동일."""
+        return flush_pending(timeout)
 
 
 def report_batch_run(
