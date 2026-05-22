@@ -11,7 +11,7 @@
 ## Project Overview
 **Insight Newsletter (v2)** — LogAnalyzer / GitHub QA Issues / Auto-Tobe (journal+commit)
 세 소스를 풀 방식으로 수집해 exaone3.5 cascade + pgvector RAG 로 합성한 주간 뉴스레터를 발송.
-기존 일/주/월 보고 (legacy) 도 `STANDUP_MODE` 로 병행 운영 가능.
+legacy 경로는 QA/Tobe Agent 데이터 수집만 `STANDUP_MODE` 로 병행 운영 (일/주/월 보고 자동 발송은 제거됨).
 
 상세: [docs/INSIGHT_NEWSLETTER.md](docs/INSIGHT_NEWSLETTER.md) ·
 [docs/AGENT_DATA_CONTRACT.md](docs/AGENT_DATA_CONTRACT.md)
@@ -55,7 +55,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 9060 --reload
 ## Project Structure
 ```
 app/
-├── agents/             # (legacy) QA-Agent, Tobe-Agent, Report-Agent
+├── agents/             # (legacy) QA-Agent, Tobe-Agent
 ├── agents_v2/          # (v2) Insight-Newsletter Agent (주간 orchestrator)
 ├── ingestion/          # Connector 기반 수집 hub + 정규화
 │   └── connectors/     # loganalyzer / github_qa / auto_tobe

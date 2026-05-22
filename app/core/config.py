@@ -43,26 +43,10 @@ class Settings(BaseSettings):
     github_token: str = Field(default="", env="GITHUB_TOKEN")
     github_org: str = Field(default="", env="GITHUB_ORG")
 
-    # 스케줄러 - 일일보고 (매일 17:00)
-    daily_report_hour: int = Field(default=17, env="DAILY_REPORT_HOUR")
-    daily_report_minute: int = Field(default=0, env="DAILY_REPORT_MINUTE")
-
-    # 스케줄러 - 주간보고 (금요일 10:00)
-    weekly_report_hour: int = Field(default=10, env="WEEKLY_REPORT_HOUR")
-    weekly_report_minute: int = Field(default=0, env="WEEKLY_REPORT_MINUTE")
-
-    # 스케줄러 - 월간보고 (마지막주 금요일 11:00)
-    monthly_report_hour: int = Field(default=11, env="MONTHLY_REPORT_HOUR")
-    monthly_report_minute: int = Field(default=0, env="MONTHLY_REPORT_MINUTE")
-
-    # Newsletter report display
-    max_projects_per_category: int = Field(default=5, env="MAX_PROJECTS_PER_CATEGORY")
-    max_items_per_project: int = Field(default=3, env="MAX_ITEMS_PER_PROJECT")
-
     # ──────────────────────────────────────────────────────────────────────
     # Insight Newsletter (v2) — exaone3.5 cascade
     # ──────────────────────────────────────────────────────────────────────
-    # 모드: legacy (기존 일/주/월) | insight (신규 주간 뉴스레터) | both (병행)
+    # 모드: legacy (QA/Tobe Agent 수집) | insight (주간 뉴스레터) | both (병행)
     standup_mode: str = Field(default="both", env="STANDUP_MODE")
 
     # Ollama (host에 설치된 모델 호출 — Docker 컨테이너에서 host.docker.internal 사용)
