@@ -2,7 +2,6 @@
 APScheduler 스케줄러 설정
 """
 
-import calendar
 import logging
 import threading
 from datetime import date
@@ -63,18 +62,6 @@ def run_initial_scan():
         logger.error(f"초기 스캔 오류: {e}", exc_info=True)
 
 
-def _is_last_friday_of_month() -> bool:
-    """오늘이 이번 달 마지막 금요일인지 확인 (KST 기준)"""
-    from .config import now_kst
-    today = now_kst().date()
-    if today.weekday() != 4:  # 금요일이 아니면 False
-        return False
-    # 이번 달의 마지막 날
-    last_day = calendar.monthrange(today.year, today.month)[1]
-    # 다음 금요일이 다음 달이면 오늘이 마지막 금요일
-    return today.day + 7 > last_day
-
-
 def _safe_add_job(func, trigger, job_id, job_name):
     """안전한 작업 등록 (개별 실패가 다른 작업에 영향 없도록)"""
     try:
@@ -92,7 +79,7 @@ def setup_scheduler():
     """스케줄러 초기화 및 작업 등록.
 
     STANDUP_MODE:
-    - legacy : 기존 일/주/월 보고 (qa/tobe/report agent)
+    - legacy : QA/Tobe agent 데이터 수집 (일/주/월 보고 발송은 제거됨)
     - insight: 신규 주간 인사이트 뉴스레터 (cascade + RAG)
     - both   : 둘 다 실행 (전환기 병행 운영)
     """
@@ -107,11 +94,9 @@ def setup_scheduler():
     if settings.is_legacy_mode:
         from ..agents.qa_agent import get_qa_agent
         from ..agents.tobe_agent import get_tobe_agent
-        from ..agents.report_agent import get_report_agent
 
         qa_agent = get_qa_agent()
         tobe_agent = get_tobe_agent()
-        report_agent = get_report_agent()
 
         # QA-Agent: 매 2시간 실행 (업무시간 내)
         _safe_add_job(
@@ -125,48 +110,6 @@ def setup_scheduler():
             tobe_agent.run,
             CronTrigger(hour="8-18", minute=30, day_of_week="mon-fri", timezone=tz),
             "tobe_agent_track", "Tobe-Agent 진행사항 추적",
-        )
-
-        # 일일보고: 월~금
-        _safe_add_job(
-            report_agent.send_daily_report,
-            CronTrigger(
-                hour=settings.daily_report_hour,
-                minute=settings.daily_report_minute,
-                day_of_week="mon-fri",
-                timezone=tz,
-            ),
-            "daily_report", "일일업무보고 발송",
-        )
-
-        # 주간보고: 금요일
-        _safe_add_job(
-            report_agent.send_weekly_report,
-            CronTrigger(
-                hour=settings.weekly_report_hour,
-                minute=settings.weekly_report_minute,
-                day_of_week="fri",
-                timezone=tz,
-            ),
-            "weekly_report", "주간업무보고 발송",
-        )
-
-        # 월간보고: 마지막주 금요일 (매주 금요일 실행 + 마지막 주 검증)
-        def _monthly_report_if_last_friday():
-            if _is_last_friday_of_month():
-                report_agent.send_monthly_report()
-            else:
-                logger.debug("월간보고 스킵: 마지막 주 금요일이 아닙니다.")
-
-        _safe_add_job(
-            _monthly_report_if_last_friday,
-            CronTrigger(
-                hour=settings.monthly_report_hour,
-                minute=settings.monthly_report_minute,
-                day_of_week="fri",
-                timezone=tz,
-            ),
-            "monthly_report", "월간업무보고 발송",
         )
 
     if settings.is_insight_mode:

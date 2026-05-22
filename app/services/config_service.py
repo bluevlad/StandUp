@@ -26,14 +26,6 @@ def get_setting(db: Session, key: str, default: str = None) -> Optional[str]:
     env_map = {
         "gmail_address": settings.gmail_address,
         "gmail_app_password": settings.gmail_app_password,
-        "daily_report_hour": str(settings.daily_report_hour),
-        "daily_report_minute": str(settings.daily_report_minute),
-        "weekly_report_hour": str(settings.weekly_report_hour),
-        "weekly_report_minute": str(settings.weekly_report_minute),
-        "monthly_report_hour": str(settings.monthly_report_hour),
-        "monthly_report_minute": str(settings.monthly_report_minute),
-        "max_projects_per_category": str(settings.max_projects_per_category),
-        "max_items_per_project": str(settings.max_items_per_project),
     }
     return env_map.get(key, default)
 
@@ -138,14 +130,6 @@ def seed_from_env(db: Session) -> dict:
     setting_seeds = [
         ("gmail_address", settings.gmail_address, "string", "email", "Gmail 발송 주소"),
         ("gmail_app_password", settings.gmail_app_password, "string", "email", "Gmail 앱 비밀번호"),
-        ("daily_report_hour", str(settings.daily_report_hour), "int", "scheduler", "일일보고 시간 (시)"),
-        ("daily_report_minute", str(settings.daily_report_minute), "int", "scheduler", "일일보고 시간 (분)"),
-        ("weekly_report_hour", str(settings.weekly_report_hour), "int", "scheduler", "주간보고 시간 (시)"),
-        ("weekly_report_minute", str(settings.weekly_report_minute), "int", "scheduler", "주간보고 시간 (분)"),
-        ("monthly_report_hour", str(settings.monthly_report_hour), "int", "scheduler", "월간보고 시간 (시)"),
-        ("monthly_report_minute", str(settings.monthly_report_minute), "int", "scheduler", "월간보고 시간 (분)"),
-        ("max_projects_per_category", str(settings.max_projects_per_category), "int", "report", "카테고리당 최대 프로젝트 수"),
-        ("max_items_per_project", str(settings.max_items_per_project), "int", "report", "프로젝트당 최대 항목 수"),
     ]
 
     for key, value, value_type, category, description in setting_seeds:
