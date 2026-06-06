@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 TARGET_PROJECTS = [
     {"name": "hopenvision", "repo": "bluevlad/hopenvision", "repo_name": "hopenvision"},
     {"name": "AllergyInsight", "repo": "bluevlad/AllergyInsight", "repo_name": "AllergyInsight"},
-    {"name": "EduFit", "repo": "bluevlad/EduFit", "repo_name": "EduFit"},
     {"name": "NewsLetterPlatform", "repo": "bluevlad/NewsLetterPlatform", "repo_name": "NewsLetterPlatform"},
     {"name": "unmong-main", "repo": "bluevlad/unmong-main", "repo_name": "unmong-main"},
     {"name": "StandUp", "repo": "bluevlad/StandUp", "repo_name": "StandUp"},

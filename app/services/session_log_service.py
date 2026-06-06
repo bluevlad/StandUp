@@ -30,7 +30,7 @@ MIN_DURATION_MIN = 30
 MIN_COMMITS = 1
 PENDING_KEYWORDS = ("TODO", "todo", "미결", "나중에", "이후", "다음에", "follow-up", "FIXME")
 TARGET_PROJECTS = [
-    "hopenvision", "AllergyInsight", "EduFit", "NewsLetterPlatform",
+    "hopenvision", "AllergyInsight", "NewsLetterPlatform",
     "unmong-main", "StandUp", "Autonomous-QA-Agent", "Auto-Tobe-Agent",
     "Claude-Opus-bluevlad", "InfraWatcher", "QA-Dashboard", "CompanyAnalyzer",
     "LogAnalyzer", "OpsConsole",
