@@ -78,6 +78,6 @@ if [ -n "${PREVIOUS_IMAGE}" ]; then
 fi
 
 log "Deployment completed successfully!"
-log "Service: http://localhost:9060"
-log "Health:  http://localhost:9060/api/v1/health"
-log "Docs:    http://localhost:9060/docs"
+log "Service: http://localhost:9065"
+log "Health:  http://localhost:9065/api/v1/health"
+log "Docs:    http://localhost:9065/docs"

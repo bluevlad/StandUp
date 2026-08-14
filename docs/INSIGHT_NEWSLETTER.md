@@ -70,31 +70,31 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 수집만:
 ```bash
-curl -X POST http://localhost:9060/api/v1/insight/ingest/run
+curl -X POST http://localhost:9065/api/v1/insight/ingest/run
 ```
 
 주간 발송 (실제 발송):
 ```bash
-curl -X POST http://localhost:9060/api/v1/insight/weekly/run \
+curl -X POST http://localhost:9065/api/v1/insight/weekly/run \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false}'
 ```
 
 dry-run (수신자 발송 X, DB 만 기록):
 ```bash
-curl -X POST http://localhost:9060/api/v1/insight/weekly/run \
+curl -X POST http://localhost:9065/api/v1/insight/weekly/run \
   -H "Content-Type: application/json" \
   -d '{"dry_run": true}'
 ```
 
 뉴스레터 미리보기 (HTML):
 ```bash
-curl http://localhost:9060/api/v1/insight/newsletters/{id}/preview
+curl http://localhost:9065/api/v1/insight/newsletters/{id}/preview
 ```
 
 수집된 이벤트 목록:
 ```bash
-curl 'http://localhost:9060/api/v1/insight/events?days=7&source_type=loganalyzer'
+curl 'http://localhost:9065/api/v1/insight/events?days=7&source_type=loganalyzer'
 ```
 
 ### 수신자 추가
@@ -266,12 +266,12 @@ send_hopen_tech_brief (hopen_tech 채널 수신자)
 
 ```bash
 # 실제 발송
-curl -X POST http://localhost:9060/api/v1/insight/hopen-brief/run \
+curl -X POST http://localhost:9065/api/v1/insight/hopen-brief/run \
   -H "Content-Type: application/json" \
   -d '{"dry_run": false}'
 
 # dry-run (DB 행은 저장, 메일 미발송)
-curl -X POST http://localhost:9060/api/v1/insight/hopen-brief/run \
+curl -X POST http://localhost:9065/api/v1/insight/hopen-brief/run \
   -H "Content-Type: application/json" \
   -d '{"dry_run": true, "window_hours": 48}'
 ```
