@@ -29,10 +29,10 @@ COPY alembic.ini .
 # Create log directory
 RUN mkdir -p /app/logs
 
-EXPOSE 9060
+EXPOSE 9065
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:9060/api/v1/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:9065/api/v1/health')" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9060"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9065"]

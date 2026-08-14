@@ -151,7 +151,7 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
 
     # API
-    api_port: int = Field(default=9060, env="API_PORT")
+    api_port: int = Field(default=9065, env="API_PORT")
     root_path: str = Field(default="", env="ROOT_PATH")
 
     @property

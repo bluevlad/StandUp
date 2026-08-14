@@ -45,7 +45,7 @@ jobs:
           GITHUB_TOKEN=${GH_TOKEN_VAL}
           GITHUB_ORG=${GH_ORG_VAL}
           LOG_LEVEL=${LOG_LEVEL:-INFO}
-          API_PORT=9060
+          API_PORT=9065
 
           # ── PR7 — tech_trend / HopenVision (모드·게이트 토글) ───────────
           STANDUP_MODE=${STANDUP_MODE:-both}
@@ -73,7 +73,7 @@ jobs:
           echo "Waiting for container to start..."
           sleep 15
           for i in 1 2 3 4 5; do
-            if curl -sf http://localhost:9060/api/v1/health > /dev/null 2>&1; then
+            if curl -sf http://localhost:9065/api/v1/health > /dev/null 2>&1; then
               echo "Health check passed!"
               exit 0
             fi

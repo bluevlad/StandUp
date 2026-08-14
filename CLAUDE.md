@@ -49,7 +49,7 @@ pip install -r requirements.txt
 alembic upgrade head
 
 # 실행
-python -m uvicorn app.main:app --host 0.0.0.0 --port 9060 --reload
+python -m uvicorn app.main:app --host 0.0.0.0 --port 9065 --reload
 ```
 
 ## Project Structure
@@ -93,7 +93,7 @@ app/
 - FK 명명: fk_{테이블}_{참조테이블}
 
 ## Port
-- API: 9060
+- API: 9065
 
 ## Fix 커밋 오류 추적
 
