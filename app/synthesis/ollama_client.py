@@ -35,8 +35,14 @@ def chat(
     temperature: float = 0.3,
     max_tokens: int = 2048,
     timeout: Optional[int] = None,
+    think: Optional[bool] = None,
 ) -> GenResult:
-    """단발 채팅. 실패 시 ok=False 로 반환."""
+    """단발 채팅. 실패 시 ok=False 로 반환.
+
+    think: thinking 계열 모델(gemma4 등)에서만 지정. False 면 reasoning 억제 —
+    구조화 출력에서 reasoning 이 num_predict 를 소진해 content 가 비는 것 방지.
+    비-thinking 모델 호출엔 None(미전송) 유지.
+    """
     url = f"{settings.ollama_base_url}/api/chat"
     payload = {
         "model": model,
@@ -50,6 +56,8 @@ def chat(
             "num_predict": max_tokens,
         },
     }
+    if think is not None:
+        payload["think"] = think
     try:
         # trust_env=False — OrbStack 등 호스트 환경의 HTTPS_PROXY/HTTP_PROXY 가
         # Ollama 호출까지 가로채는 사고 방지. Ollama 는 보통 같은 호스트

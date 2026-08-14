@@ -169,6 +169,8 @@ def _stage1_summarize(events: list[IngestionEvent]) -> list[str]:
             user=SUMMARIZE_USER_TPL.format(events_text=events_text),
             temperature=0.2,
             max_tokens=1024,
+            # think=False: gemma4 계열 reasoning 억제 — 요약이 max_tokens 소진으로 비는 것 방지
+            think=False,
         )
         if result.ok and result.text:
             summaries.append(result.text)

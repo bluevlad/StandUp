@@ -51,7 +51,8 @@ class Settings(BaseSettings):
 
     # Ollama (host에 설치된 모델 호출 — Docker 컨테이너에서 host.docker.internal 사용)
     ollama_base_url: str = Field(default="http://host.docker.internal:11434", env="OLLAMA_BASE_URL")
-    ollama_model_summarize: str = Field(default="llama3.2:3b", env="OLLAMA_MODEL_SUMMARIZE")
+    # 2026-08-13 llama3.2:3b → gemma4:12b-mlx 전환 (LLMOps label_match 평가에서 llama 열세 → 설치 제거)
+    ollama_model_summarize: str = Field(default="gemma4:12b-mlx", env="OLLAMA_MODEL_SUMMARIZE")
     ollama_model_analyze: str = Field(default="qwen2.5-coder:14b", env="OLLAMA_MODEL_ANALYZE")
     ollama_model_compose: str = Field(default="exaone3.5:7.8b", env="OLLAMA_MODEL_COMPOSE")
     ollama_model_embed: str = Field(default="nomic-embed-text", env="OLLAMA_MODEL_EMBED")

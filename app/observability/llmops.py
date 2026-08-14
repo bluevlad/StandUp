@@ -17,7 +17,7 @@
         ended_at=datetime.utcnow(),
         status="success",
         stages=[
-            {"name": "summarization", "model": "llama3.2:3b",
+            {"name": "summarization", "model": "gemma4:12b-mlx",
              "tokens_in": 1024, "tokens_out": 180, "duration_ms": 31200},
         ],
         metrics={"items_processed": 12},

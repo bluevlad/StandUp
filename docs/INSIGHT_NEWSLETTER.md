@@ -14,7 +14,7 @@
                               [임베딩 by nomic-embed-text]
                                       ↓
                   ┌──────  Synthesis 3-stage cascade  ──────┐
-                  │ Stage 1: llama3.2:3b      (요약)         │
+                  │ Stage 1: gemma4:12b-mlx   (요약)         │
                   │ Stage 2: qwen2.5-coder:14b (분석/JSON)   │
                   │ Stage 3: exaone3.5:7.8b   (한국어 본문)  │
                   └──────────────────────────────────────────┘
@@ -39,7 +39,7 @@
 
 | Stage | 모델 | 역할 | 메모리 |
 |---|---|---|---|
-| 1 | `llama3.2:3b` | 청크 요약 | 2GB |
+| 1 | `gemma4:12b-mlx` | 청크 요약 (think:false) | 7GB |
 | 2 | `qwen2.5-coder:14b` | 인사이트/패턴 추출 (JSON 출력) | 9GB |
 | 3 | `exaone3.5:7.8b` | 최종 한국어 본문 작성 | 5GB |
 | Embed | `nomic-embed-text` | 768-dim 임베딩 | 0.3GB |
