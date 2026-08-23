@@ -8,6 +8,8 @@
 - Docker 명령은 현재 호스트에서 바로 실행 (별도 SSH 접속 불필요)
 - compose 파일 선택: Darwin → `docker-compose.yml` / Windows → `docker-compose.local.yml`
 
+> 3-머신 작업 환경(MacBook 편집·운영 / Desktop 터미널·AutoQA / Notebook TIPAIP2 격리) 규칙: [WORKSTATION_GUIDE.md](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/infrastructure/environments/WORKSTATION_GUIDE.md) — 개인 서비스 편집은 MacBook 에서만, Desktop 은 pull-only
+
 ## Project Overview
 **Insight Newsletter (v2)** — LogAnalyzer / GitHub QA Issues / Auto-Tobe (journal+commit)
 세 소스를 풀 방식으로 수집해 exaone3.5 cascade + pgvector RAG 로 합성한 주간 뉴스레터를 발송.
