@@ -131,13 +131,29 @@ Affected-Layer: backend/api
 
 이번 v2 범위에서 제외. 필요 시 connector 추가는 동일 패턴으로 가능.
 
-## 자동 효과 검증 로직
+## 자동 효과 검증 로직 (구현됨 — `app/services/fix_verification_service.py`)
 
-3개 소스가 모두 갖춰지면:
+1. Auto-Tobe fix 이벤트에서 fingerprint 추출:
+   - journal — YAML `before_log_signature: "..."` (복수 entry 는 모두 수집)
+   - commit — footer `Before-Log-Signature: <fingerprint>` (선택, Root-Cause 옆에 추가)
+2. fix 시점 + `FIX_VERIFICATION_WINDOW_DAYS`(기본 7일) 동안 LogAnalyzer
+   `error_group` 이벤트에서 같은 fingerprint 재등장 여부를 조회
+3. 판정 (결정적, LLM 무관):
+   - `verified` ✅ window 경과 + 재발 없음
+   - `recurred` ❌ window 내 재등장 (최초 시각·횟수 기록)
+   - `pending` ⏳ window 미경과
+   - `unlinked` fingerprint 연결 정보 없음 → 검증 불가
+4. 뉴스레터 반영 — stage-3 compose 에 `[효과 검증]` 블록으로 주입되어
+   LLM 은 이 판정만 인용 (임의 판정 금지). `newsletters.kpis.fix_verifications`
+   에도 저장되어 API 로 조회 가능.
+5. 조회: `GET /api/v1/insight/verifications?lookback_days=14`
 
-1. Auto-Tobe-Agent 의 fix commit 에서 `before_log_signature` 또는 `Root-Cause` 추출
-2. fix 시점 + 7일 동안 LogAnalyzer 에서 같은 fingerprint 가 다시 등장하는지 확인
-3. 등장 안 함 → ✅ 성공 라벨 / 등장 → ❌ 재발 라벨
-4. 다음 주 뉴스레터 §2 에 자동 표시 — **사람 라벨링 없이 학습 신호 생성**
+확정 판정(verified/recurred)은 `corpus_fixes` 청크의 `metadata_json.verification`
+에 누적되어, retrieval 우선순위에 반영됨.
 
-이 신호는 RAG 청크의 `metadata_json` 에 누적되어, retrieval 우선순위에 반영됨.
+> commit footer 예시:
+> ```
+> Root-Cause: null-handling
+> Before-Log-Signature: 534c11c4240a341e
+> Affected-Layer: backend/api
+> ```

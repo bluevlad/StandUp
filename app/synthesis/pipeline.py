@@ -344,6 +344,7 @@ def _stage3_compose(
     analysis: dict,
     rag_refs: list[RetrievedChunk],
     summaries_top: str,
+    verification_block: str = "(효과 검증 데이터 없음)",
 ) -> str:
     user = COMPOSE_USER_TPL.format(
         period_start=period_start.isoformat(),
@@ -352,6 +353,7 @@ def _stage3_compose(
         analysis_json=json.dumps(analysis, ensure_ascii=False, indent=2),
         rag_block=_format_rag_block(rag_refs),
         summaries_top=summaries_top,
+        verification_block=verification_block,
     )
     result = chat(
         model=settings.ollama_model_compose,
@@ -438,6 +440,19 @@ def synthesize(
         ))
 
         kpis = _extract_kpis(events, session=session)
+
+        # 효과 검증 — fix 후 fingerprint 재발 여부의 결정적 판정.
+        # 실패해도 합성은 계속 (검증 없는 뉴스레터가 뉴스레터 없음보다 낫다).
+        from ..services.fix_verification_service import (
+            format_verification_block, record_chunk_verification, verify_fixes,
+        )
+        try:
+            fix_verifications = verify_fixes(session)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("fix 효과 검증 실패 (합성 계속): %s", e)
+            fix_verifications = []
+        kpis["fix_verifications"] = [v.to_dict() for v in fix_verifications]
+
         meta: dict = {
             "models": {
                 "summarize": settings.ollama_model_summarize,
@@ -445,7 +460,15 @@ def synthesize(
                 "compose": settings.ollama_model_compose,
             },
             "event_count": len(events),
+            "fix_verification_count": len(fix_verifications),
         }
+
+        # 확정 판정(verified/recurred)은 corpus_fixes 청크 metadata 에 누적 —
+        # retrieval 시 학습 신호. 자체 세션·커밋이라 본 세션과 무관.
+        try:
+            record_chunk_verification(fix_verifications)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("검증 metadata 기록 실패 (합성 계속): %s", e)
 
         # Stage 1
         t0 = datetime.now()
@@ -473,6 +496,7 @@ def synthesize(
         summaries_top = "\n\n".join(summaries[:3]) if summaries else "(요약 없음)"
         markdown = _stage3_compose(
             period_start, period_end, kpis, analysis, rag_refs, summaries_top,
+            verification_block=format_verification_block(fix_verifications),
         )
         meta["stage3_ms"] = int((datetime.now() - t0).total_seconds() * 1000)
 

@@ -168,8 +168,18 @@ def _build_kpi_items(kpis: dict) -> list[dict]:
     return items
 
 
-def render_newsletter(syn: SynthesisOutput) -> dict:
-    """SynthesisOutput → {subject, headline, html, plain_summary}."""
+def render_newsletter(
+    syn: SynthesisOutput,
+    *,
+    include_tech_topics: bool | None = None,
+) -> dict:
+    """SynthesisOutput → {subject, headline, html, plain_summary}.
+
+    include_tech_topics: None 이면 settings.insight_weekly_tech_section_enabled 를
+    따른다 (기본 False — 기술 토픽 큐레이션은 TechBriefing 담당으로 이관).
+    """
+    if include_tech_topics is None:
+        include_tech_topics = settings.insight_weekly_tech_section_enabled
     subject = (
         f"{settings.insight_subject_prefix} {syn.period_start} ~ {syn.period_end} · "
         f"{syn.headline}"
@@ -196,7 +206,9 @@ def render_newsletter(syn: SynthesisOutput) -> dict:
         period_end=syn.period_end.isoformat(),
         generated_at=now_kst().strftime("%Y-%m-%d %H:%M KST"),
         kpi_items=_build_kpi_items(syn.kpis),
-        tech_topics=_build_tech_topic_items(syn.tech_topics),
+        tech_topics=(
+            _build_tech_topic_items(syn.tech_topics) if include_tech_topics else []
+        ),
         body_html=body_html,
         feedback_up=feedback_up,
         feedback_down=feedback_down,

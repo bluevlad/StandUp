@@ -147,6 +147,22 @@ class Settings(BaseSettings):
     insight_window_days: int = Field(default=7, env="INSIGHT_WINDOW_DAYS")
     insight_subject_prefix: str = Field(default="[StandUp Insight]", env="INSIGHT_SUBJECT_PREFIX")
 
+    # ── TechBriefing 흡수 전환 (Phase 1) ──────────────────────────────────
+    # false 면 주간 합성·저장·RAG 색인은 그대로 수행하되 메일 발송만 생략.
+    # TechBriefing(NewsLetterPlatform) 이 /api/v1/insight/newsletters 를 pull 해
+    # 섹션으로 게재하는 체제로 전환 완료 시 false 로 내린다.
+    insight_send_enabled: bool = Field(default=True, env="INSIGHT_SEND_ENABLED")
+    # 주간 뉴스레터의 "이번 주 기술 토픽" 섹션 — 기술 토픽 큐레이션은
+    # TechBriefing 담당으로 이관되어 기본 비활성. tech_topics 수집·HopenVision
+    # 제안 파이프라인은 이 플래그와 무관하게 계속 동작한다.
+    insight_weekly_tech_section_enabled: bool = Field(
+        default=False, env="INSIGHT_WEEKLY_TECH_SECTION_ENABLED",
+    )
+    # fix 효과 검증 — fix 시점 이후 같은 fingerprint 재발을 감시하는 기간(일)
+    fix_verification_window_days: int = Field(
+        default=7, env="FIX_VERIFICATION_WINDOW_DAYS",
+    )
+
     # 로깅
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
 
