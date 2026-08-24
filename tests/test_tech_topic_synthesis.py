@@ -244,7 +244,7 @@ def test_render_newsletter_includes_tech_topic_section():
              "source": "google", "description": "...", "published_at": ""},
         ],
     )])
-    result = render_newsletter(syn)
+    result = render_newsletter(syn, include_tech_topics=True)
     html = result["html"]
     assert "이번 주 기술 토픽" in html
     assert "Java 21" in html
@@ -257,6 +257,13 @@ def test_render_newsletter_includes_tech_topic_section():
 
 def test_render_newsletter_omits_section_when_no_topics():
     syn = _make_synthesis([])
+    result = render_newsletter(syn, include_tech_topics=True)
+    assert "이번 주 기술 토픽" not in result["html"]
+
+
+def test_render_newsletter_hides_tech_section_by_default():
+    """TechBriefing 이관 — 기본값(설정 미변경)에서는 토픽이 있어도 섹션 미렌더."""
+    syn = _make_synthesis([TechTopic(keyword="Java 21", digest_title="t")])
     result = render_newsletter(syn)
     assert "이번 주 기술 토픽" not in result["html"]
 
@@ -267,7 +274,7 @@ def test_render_newsletter_does_not_emit_anchor_for_file_url():
         digest_title="title",
         digest_url="file:///tmp/x.md",
     )])
-    result = render_newsletter(syn)
+    result = render_newsletter(syn, include_tech_topics=True)
     assert "file:///tmp/x.md" not in result["html"]
 
 

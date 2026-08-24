@@ -26,6 +26,17 @@ logger = logging.getLogger(__name__)
 class AutoTobeConnector(Connector):
     name = "auto_tobe"
 
+    # AGENT_DATA_CONTRACT — journal YAML `before_log_signature: "534c11c4240a341e"`
+    # LogAnalyzer fingerprint 와 매칭하면 효과 검증 자동.
+    _BEFORE_SIG_RE = re.compile(
+        r"before_log_signature:\s*[\"']?([0-9a-fA-F]{8,64})[\"']?"
+    )
+    # commit footer 확장 — `Before-Log-Signature: <fingerprint>` (선택)
+    _COMMIT_SIG_RE = re.compile(
+        r"^Before-Log-Signature:\s*[\"']?([0-9a-fA-F]{8,64})[\"']?",
+        re.MULTILINE | re.IGNORECASE,
+    )
+
     def __init__(self, journal_glob: str, git_repos: list[str]):
         self.journal_glob = journal_glob
         self.git_repos = git_repos
@@ -67,6 +78,11 @@ class AutoTobeConnector(Connector):
 
             digest = hashlib.sha256(content.encode()).hexdigest()[:16]
             excerpt = content[:240] + ("…" if len(content) > 240 else "")
+            signatures = list(dict.fromkeys(self._BEFORE_SIG_RE.findall(content)))
+            canonical: dict = {"path": str(p), "size": len(content)}
+            if signatures:
+                canonical["before_log_signature"] = signatures[0]
+                canonical["before_log_signatures"] = signatures
             out.append(CanonicalEvent(
                 source_type=SOURCE_AUTO_TOBE_JOURNAL,
                 source_id=f"{p.name}#{digest}",
@@ -75,7 +91,7 @@ class AutoTobeConnector(Connector):
                 source_url=f"file://{p}",
                 category="fix_journal",
                 severity="info",
-                canonical={"path": str(p), "size": len(content)},
+                canonical=canonical,
                 raw_excerpt=excerpt,
                 extra_chunks=[
                     ChunkSpec(
@@ -130,8 +146,10 @@ class AutoTobeConnector(Connector):
 
             rc_match = self._ROOT_CAUSE_RE.search(body)
             layer_match = self._LAYER_RE.search(body)
+            sig_match = self._COMMIT_SIG_RE.search(body)
             root_cause = rc_match.group(1) if rc_match else None
             layer = layer_match.group(1) if layer_match else None
+            before_sig = sig_match.group(1) if sig_match else None
 
             excerpt = (subject + "\n" + body)[:240]
             chunk_text = f"[FIX] {subject}\n\n{body}\n\n(repo={repo.name} sha={sha[:8]})"
@@ -150,6 +168,7 @@ class AutoTobeConnector(Connector):
                     "sha": sha,
                     "root_cause": root_cause,
                     "affected_layer": layer,
+                    "before_log_signature": before_sig,
                     "subject": subject,
                     "body": body,
                 },

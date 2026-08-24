@@ -115,6 +115,20 @@ def list_events(
     ]
 
 
+@router.get("/verifications")
+def list_verifications(
+    lookback_days: int = Query(14, ge=1, le=90),
+    db: Session = Depends(get_db),
+):
+    """fix 효과 검증 판정 조회 — verified(✅)/recurred(❌)/pending(⏳)/unlinked.
+
+    Auto-Tobe fix 이벤트에 연결된 LogAnalyzer fingerprint 의
+    window(FIX_VERIFICATION_WINDOW_DAYS) 내 재발 여부를 결정적으로 계산.
+    """
+    from ....services.fix_verification_service import verify_fixes
+    return [v.to_dict() for v in verify_fixes(db, lookback_days=lookback_days)]
+
+
 @router.get("/newsletters")
 def list_newsletters(limit: int = Query(20, ge=1, le=100),
                      db: Session = Depends(get_db)):

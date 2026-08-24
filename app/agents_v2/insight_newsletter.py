@@ -125,12 +125,17 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
             session.rollback()
 
     # 5. Send (dry_run 이면 발송 X)
+    #    INSIGHT_SEND_ENABLED=false — TechBriefing 흡수 전환: 합성·저장·색인은
+    #    유지하되 단독 메일 발송만 생략 (TechBriefing 이 API 로 pull).
+    effective_dry_run = dry_run or not settings.insight_send_enabled
+    if effective_dry_run and not dry_run:
+        logger.info("INSIGHT_SEND_ENABLED=false — 단독 발송 생략 (newsletter=%s)", nl_id)
     send_result: SendSummary
     with SessionLocal() as session:
         nl_to_send = session.get(Newsletter, nl_id)
         if nl_to_send is None:
             raise RuntimeError(f"newsletter {nl_id} 가 사라짐")
-        send_result = send_newsletter(nl_to_send, dry_run=dry_run)
+        send_result = send_newsletter(nl_to_send, dry_run=effective_dry_run)
     logger.info("send 완료: %s", send_result)
 
     # 6. tech_topics → HopenVision 제안 (+ DevPlan 자동 초안화)
