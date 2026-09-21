@@ -69,8 +69,8 @@ app/
 ├── core/               # config, database, scheduler
 ├── models/             # SQLAlchemy (insight.py 추가)
 ├── schemas/
-├── services/           # GitHub, Email, Report 서비스
-├── templates/          # Jinja2 (insight_newsletter.html 추가)
+├── services/           # GitHub, config, stats, dev_plan, session_log 등 (Email/Report 서비스는 제거됨)
+├── templates/          # Jinja2 (insight_newsletter.html, dashboard/)
 └── api/v1/endpoints/   # FastAPI (insight.py 추가)
 ```
 

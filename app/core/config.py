@@ -32,12 +32,7 @@ class Settings(BaseSettings):
         env="DATABASE_URL"
     )
 
-    # Gmail SMTP
-    gmail_address: str = Field(default="", env="GMAIL_ADDRESS")
-    gmail_app_password: str = Field(default="", env="GMAIL_APP_PASSWORD")
 
-    # 이메일 수신자 (콤마 구분)
-    report_recipients: str = Field(default="", env="REPORT_RECIPIENTS")
 
     # GitHub
     github_token: str = Field(default="", env="GITHUB_TOKEN")
@@ -192,13 +187,6 @@ class Settings(BaseSettings):
     @property
     def is_legacy_mode(self) -> bool:
         return self.standup_mode in ("legacy", "both")
-
-    @property
-    def recipient_list(self) -> list[str]:
-        """수신자 목록 반환"""
-        if not self.report_recipients:
-            return []
-        return [r.strip() for r in self.report_recipients.split(",") if r.strip()]
 
     class Config:
         env_file = ".env"

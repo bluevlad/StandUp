@@ -36,13 +36,3 @@ def get_trend(
     service = get_stats_service()
     return service.get_trend(db, period_type=period_type, date_from=date_from, date_to=date_to)
 
-
-@router.get("/reports")
-def get_report_stats(
-    date_from: datetime = None,
-    date_to: datetime = None,
-    db: Session = Depends(get_db),
-):
-    """보고서 발송 통계"""
-    service = get_stats_service()
-    return service.get_report_stats(db, date_from=date_from, date_to=date_to)

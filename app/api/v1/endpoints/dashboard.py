@@ -11,10 +11,8 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from ....core.config import settings, APP_VERSION
 from ....core.database import get_db
-from ....models.report import ReportType, ReportStatus
 from ....models.issue import WorkItem, ItemCategory, ItemStatus
 from ....models.insight import Newsletter, IngestionEvent
-from ....services.report_service import get_report_service
 from ....services.stats_service import get_stats_service
 from ....services.dev_plan_service import get_dev_plan_service
 from ....services.session_log_service import get_session_log_service
@@ -41,12 +39,9 @@ def _render(template_name: str, **kwargs) -> HTMLResponse:
 
 @router.get("", response_class=HTMLResponse)
 def dashboard_home(db: Session = Depends(get_db)):
-    """대시보드 메인 (최근 보고서 + 프로젝트 현황)"""
-    service = get_report_service()
+    """대시보드 메인 (프로젝트 현황)"""
     stats_svc = get_stats_service()
     dev_plan_svc = get_dev_plan_service()
-
-    recent_reports = service.get_reports(db, limit=5)
 
     # TARGET_PROJECTS 기준 전체 기간 요약
     summary = stats_svc.get_target_projects_summary(db)
@@ -73,79 +68,10 @@ def dashboard_home(db: Session = Depends(get_db)):
 
     return _render(
         "home.html",
-        recent_reports=recent_reports,
         summary=summary,
         overall=overall,
         projects=projects,
         active_page="home",
-    )
-
-
-@router.get("/reports", response_class=HTMLResponse)
-def report_list(
-    report_type: str = Query(default=None),
-    status: str = Query(default=None),
-    page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
-):
-    """보고서 리스트 페이지"""
-    service = get_report_service()
-    limit = 20
-    offset = (page - 1) * limit
-
-    rt = None
-    if report_type and report_type in ("daily", "weekly", "monthly"):
-        rt = ReportType(report_type)
-
-    reports = service.get_reports(db, report_type=rt, limit=limit, offset=offset)
-
-    return _render(
-        "report_list.html",
-        reports=reports,
-        current_type=report_type or "all",
-        current_status=status or "all",
-        current_page=page,
-        active_page="reports",
-    )
-
-
-@router.get("/reports/table", response_class=HTMLResponse)
-def report_table_partial(
-    report_type: str = Query(default=None),
-    page: int = Query(default=1, ge=1),
-    db: Session = Depends(get_db),
-):
-    """HTMX 파셜: 보고서 테이블"""
-    service = get_report_service()
-    limit = 20
-    offset = (page - 1) * limit
-
-    rt = None
-    if report_type and report_type in ("daily", "weekly", "monthly"):
-        rt = ReportType(report_type)
-
-    reports = service.get_reports(db, report_type=rt, limit=limit, offset=offset)
-
-    return _render(
-        "partials/report_table.html",
-        reports=reports,
-        current_page=page,
-        current_type=report_type or "all",
-    )
-
-
-@router.get("/reports/{report_id}", response_class=HTMLResponse)
-def report_detail(report_id: int, db: Session = Depends(get_db)):
-    """보고서 상세 페이지"""
-    service = get_report_service()
-    report = service.get_report(db, report_id)
-    if not report:
-        return HTMLResponse(content="<h1>404 - 보고서를 찾을 수 없습니다</h1>", status_code=404)
-
-    return _render(
-        "report_detail.html",
-        report=report,
-        active_page="reports",
     )
 
 
@@ -258,13 +184,11 @@ def stats_page(
     stats_svc = get_stats_service()
     summary = stats_svc.get_summary(db, period_type=period_type)
     trend = stats_svc.get_trend(db, period_type=period_type)
-    report_stats = stats_svc.get_report_stats(db)
 
     return _render(
         "stats.html",
         summary=summary,
         trend=trend,
-        report_stats=report_stats,
         current_period=period_type,
         active_page="stats",
     )

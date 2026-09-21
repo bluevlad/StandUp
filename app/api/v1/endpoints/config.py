@@ -11,12 +11,10 @@ from sqlalchemy.orm import Session
 from ....core.database import get_db
 from ....models.git_provider import GitProvider, ProviderType
 from ....models.repository import Repository
-from ....models.recipient import Recipient
 from ....models.app_setting import AppSetting
 from ....schemas.config import (
     GitProviderCreate, GitProviderUpdate, GitProviderResponse,
     RepositoryCreate, RepositoryUpdate, RepositoryResponse,
-    RecipientCreate, RecipientUpdate, RecipientResponse,
     AppSettingUpdate, AppSettingBulkUpdate, AppSettingResponse,
     SetupStatusResponse,
 )
@@ -215,80 +213,6 @@ def delete_repository(repo_id: int, db: Session = Depends(get_db)):
 
 
 # ============================================================
-# Recipients
-# ============================================================
-
-@router.get("/recipients", response_model=list[RecipientResponse])
-def list_recipients(db: Session = Depends(get_db)):
-    """수신자 목록 조회"""
-    return db.query(Recipient).order_by(Recipient.id).all()
-
-
-@router.post("/recipients", response_model=RecipientResponse, status_code=201)
-def create_recipient(data: RecipientCreate, db: Session = Depends(get_db)):
-    """수신자 등록"""
-    existing = db.query(Recipient).filter(Recipient.email == data.email).first()
-    if existing:
-        raise HTTPException(status_code=409, detail=f"이미 등록된 이메일입니다: {data.email}")
-
-    recipient = Recipient(
-        name=data.name,
-        email=data.email,
-        report_types=data.report_types,
-        is_active=data.is_active,
-    )
-    db.add(recipient)
-    db.commit()
-    db.refresh(recipient)
-    return recipient
-
-
-@router.get("/recipients/{recipient_id}", response_model=RecipientResponse)
-def get_recipient(recipient_id: int, db: Session = Depends(get_db)):
-    """수신자 상세 조회"""
-    recipient = db.query(Recipient).filter(Recipient.id == recipient_id).first()
-    if not recipient:
-        raise HTTPException(status_code=404, detail="수신자를 찾을 수 없습니다.")
-    return recipient
-
-
-@router.put("/recipients/{recipient_id}", response_model=RecipientResponse)
-def update_recipient(recipient_id: int, data: RecipientUpdate, db: Session = Depends(get_db)):
-    """수신자 수정"""
-    recipient = db.query(Recipient).filter(Recipient.id == recipient_id).first()
-    if not recipient:
-        raise HTTPException(status_code=404, detail="수신자를 찾을 수 없습니다.")
-
-    update_data = data.model_dump(exclude_unset=True)
-    if "email" in update_data:
-        dup = db.query(Recipient).filter(
-            Recipient.email == update_data["email"],
-            Recipient.id != recipient_id,
-        ).first()
-        if dup:
-            raise HTTPException(status_code=409, detail=f"이미 등록된 이메일입니다: {update_data['email']}")
-
-    for key, value in update_data.items():
-        setattr(recipient, key, value)
-
-    db.commit()
-    db.refresh(recipient)
-    return recipient
-
-
-@router.delete("/recipients/{recipient_id}")
-def delete_recipient(recipient_id: int, db: Session = Depends(get_db)):
-    """수신자 삭제"""
-    recipient = db.query(Recipient).filter(Recipient.id == recipient_id).first()
-    if not recipient:
-        raise HTTPException(status_code=404, detail="수신자를 찾을 수 없습니다.")
-
-    db.delete(recipient)
-    db.commit()
-    return {"message": f"'{recipient.name}' 수신자가 삭제되었습니다."}
-
-
-# ============================================================
 # App Settings
 # ============================================================
 
@@ -371,16 +295,13 @@ def get_setup_status(db: Session = Depends(get_db)):
     """초기화 상태 확인"""
     providers = db.query(GitProvider).filter(GitProvider.is_active == True).count()  # noqa: E712
     repos = db.query(Repository).filter(Repository.is_active == True).count()  # noqa: E712
-    recipients = db.query(Recipient).filter(Recipient.is_active == True).count()  # noqa: E712
     settings_count = db.query(AppSetting).count()
 
     return SetupStatusResponse(
         git_providers_configured=providers > 0,
         repositories_count=repos,
-        recipients_configured=recipients > 0,
-        recipients_count=recipients,
         app_settings_count=settings_count,
-        is_ready=providers > 0 and recipients > 0,
+        is_ready=providers > 0,
     )
 
 

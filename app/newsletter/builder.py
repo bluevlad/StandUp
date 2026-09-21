@@ -11,7 +11,6 @@ from __future__ import annotations
 import html
 import logging
 import re
-import urllib.parse
 from datetime import datetime
 from pathlib import Path
 
@@ -188,16 +187,6 @@ def render_newsletter(
     body_html = _md_to_html(syn.markdown)
     body_html = _replace_refs(body_html)
 
-    feedback_base = "mailto:" + (settings.gmail_address or "")
-    feedback_up = (
-        feedback_base + "?subject=" +
-        urllib.parse.quote(f"[👍] {subject}")
-    )
-    feedback_down = (
-        feedback_base + "?subject=" +
-        urllib.parse.quote(f"[👎] {subject}")
-    )
-
     template = _jinja.get_template("insight_newsletter.html")
     html_full = template.render(
         subject=subject,
@@ -210,8 +199,6 @@ def render_newsletter(
             _build_tech_topic_items(syn.tech_topics) if include_tech_topics else []
         ),
         body_html=body_html,
-        feedback_up=feedback_up,
-        feedback_down=feedback_down,
     )
 
     plain = _build_plain_summary(syn)
