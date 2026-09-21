@@ -20,9 +20,6 @@ jobs:
         env:
           # Secrets — 민감정보 (repo secret 유지)
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          REPORT_RECIPIENTS: ${{ secrets.REPORT_RECIPIENTS }}
           GH_TOKEN_VAL: ${{ secrets.GH_TOKEN }}
           # Variables — 비민감 설정값 (repo variables, ENVIRONMENT_STANDARD.md §8.4)
           GH_ORG_VAL: ${{ vars.GH_ORG }}
@@ -41,9 +38,6 @@ jobs:
         run: |
           cat > .env.production << EOF
           DATABASE_URL=${DATABASE_URL}
-          GMAIL_ADDRESS=${GMAIL_ADDRESS}
-          GMAIL_APP_PASSWORD=${GMAIL_APP_PASSWORD}
-          REPORT_RECIPIENTS=${REPORT_RECIPIENTS}
           GITHUB_TOKEN=${GH_TOKEN_VAL}
           GITHUB_ORG=${GH_ORG_VAL}
           LOG_LEVEL=${LOG_LEVEL:-INFO}

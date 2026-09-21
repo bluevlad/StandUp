@@ -69,34 +69,6 @@
     </div>
 </div>
 
-<!-- Report Stats -->
-<div class="card">
-    <div class="card-header">
-        <h2>보고서 발송 현황</h2>
-    </div>
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:16px;">
-        <div class="summary-card blue">
-            <div class="number">{{ report_stats.total_reports }}</div>
-            <div class="label">전체 보고서</div>
-        </div>
-        <div class="summary-card green">
-            <div class="number">{{ report_stats.success_rate }}%</div>
-            <div class="label">발송 성공률</div>
-        </div>
-        <div class="summary-card" style="border-top:3px solid #dbeafe;">
-            <div class="number" style="color:#1e40af;">{{ report_stats.by_type.get('daily', 0) }}</div>
-            <div class="label">일일보고</div>
-        </div>
-        <div class="summary-card" style="border-top:3px solid #dcfce7;">
-            <div class="number" style="color:#166534;">{{ report_stats.by_type.get('weekly', 0) }}</div>
-            <div class="label">주간보고</div>
-        </div>
-        <div class="summary-card" style="border-top:3px solid #fef3c7;">
-            <div class="number" style="color:#92400e;">{{ report_stats.by_type.get('monthly', 0) }}</div>
-            <div class="label">월간보고</div>
-        </div>
-    </div>
-</div>
 
 <!-- Project Bar Chart -->
 {% if summary.projects %}

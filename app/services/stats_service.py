@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from ..core.config import now_kst
 from ..models.issue import WorkItem, ItemCategory, ItemStatus
-from ..models.report import Report, ReportItem, ReportType, ReportStatus
 
 
 class StatsService:
@@ -89,45 +88,6 @@ class StatsService:
             return self._group_by_week(items, date_from, date_to)
         else:
             return self._group_by_day(items, date_from, date_to)
-
-    def get_report_stats(
-        self,
-        db: Session,
-        date_from: datetime | None = None,
-        date_to: datetime | None = None,
-    ) -> dict:
-        """보고서 발송 통계"""
-        now = now_kst()
-        if date_from is None:
-            date_from = now - timedelta(days=30)
-        if date_to is None:
-            date_to = now
-
-        reports = (
-            db.query(Report)
-            .filter(
-                Report.generated_at >= date_from,
-                Report.generated_at <= date_to,
-            )
-            .all()
-        )
-
-        by_type = {}
-        by_status = {}
-        for r in reports:
-            by_type[r.report_type.value] = by_type.get(r.report_type.value, 0) + 1
-            by_status[r.status.value] = by_status.get(r.status.value, 0) + 1
-
-        total = len(reports)
-        sent = by_status.get("sent", 0) + by_status.get("partial_sent", 0)
-        success_rate = round((sent / total * 100), 1) if total > 0 else 0.0
-
-        return {
-            "total_reports": total,
-            "by_type": by_type,
-            "by_status": by_status,
-            "success_rate": success_rate,
-        }
 
     def _default_range(self, period_type: str, now: datetime) -> tuple[datetime, datetime]:
         """period_type에 따른 기본 날짜 범위"""

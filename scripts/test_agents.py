@@ -30,7 +30,7 @@ def main():
     logger.info("=== Agent 통합 테스트 시작 ===")
     logger.info(f"DB: {settings.database_url}")
 
-    from app.models import WorkItem, Report, ReportItem  # noqa: F401
+    from app.models import WorkItem  # noqa: F401
     Base.metadata.create_all(bind=engine)
     logger.info("DB 테이블 생성 완료")
 

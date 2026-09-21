@@ -5,7 +5,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 # ============================================================
@@ -77,36 +77,6 @@ class RepositoryResponse(BaseModel):
 
 
 # ============================================================
-# Recipient
-# ============================================================
-
-class RecipientCreate(BaseModel):
-    name: str = Field(..., max_length=200)
-    email: EmailStr
-    report_types: str = Field(default="all", max_length=100)
-    is_active: bool = True
-
-
-class RecipientUpdate(BaseModel):
-    name: Optional[str] = Field(None, max_length=200)
-    email: Optional[EmailStr] = None
-    report_types: Optional[str] = Field(None, max_length=100)
-    is_active: Optional[bool] = None
-
-
-class RecipientResponse(BaseModel):
-    id: int
-    name: str
-    email: str
-    report_types: str
-    is_active: bool
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
-
-    model_config = {"from_attributes": True}
-
-
-# ============================================================
 # App Setting
 # ============================================================
 
@@ -145,7 +115,5 @@ class AppSettingResponse(BaseModel):
 class SetupStatusResponse(BaseModel):
     git_providers_configured: bool
     repositories_count: int
-    recipients_configured: bool
-    recipients_count: int
     app_settings_count: int
     is_ready: bool
