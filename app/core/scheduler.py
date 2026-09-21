@@ -48,7 +48,7 @@ def run_initial_scan():
             tobe_agent.run()
 
         if settings.is_insight_mode:
-            # 초기 ingestion 만 실행 — 합성/발송은 스케줄에 맡김
+            # 초기 ingestion 만 실행 — 합성/저장은 스케줄에 맡김
             from ..ingestion.hub import IngestionHub
             try:
                 result = IngestionHub(embed_chunks=True).run()
@@ -80,7 +80,7 @@ def setup_scheduler():
 
     STANDUP_MODE:
     - legacy : QA/Tobe agent 데이터 수집 (일/주/월 보고 발송은 제거됨)
-    - insight: 신규 주간 인사이트 뉴스레터 (cascade + RAG)
+    - insight: 신규 주간 인사이트 뉴스레터 생성 (cascade + RAG, 메일 발송 없음)
     - both   : 둘 다 실행 (전환기 병행 운영)
     """
     # 이벤트 리스너 등록
@@ -123,7 +123,7 @@ def setup_scheduler():
                 minute=settings.insight_weekly_minute,
                 timezone=tz,
             ),
-            "insight_weekly", "Insight 주간 뉴스레터 발송 (exaone3.5 cascade)",
+            "insight_weekly", "Insight 주간 뉴스레터 합성·저장 (cascade + RAG)",
         )
 
         # HopenTechBrief — 일일 (PR6). insight 모드 안에서 별도 토글로 제어.
@@ -138,7 +138,7 @@ def setup_scheduler():
                     timezone=tz,
                 ),
                 "hopen_tech_brief_daily",
-                "HopenTechBrief 일일 카드 메일 발송 (게이트+detailer)",
+                "HopenTechBrief 일일 카드 생성·저장 (게이트+detailer)",
             )
 
     scheduler.start()

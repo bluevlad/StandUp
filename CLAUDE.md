@@ -12,7 +12,9 @@
 
 ## Project Overview
 **Insight Newsletter (v2)** — LogAnalyzer / GitHub QA Issues / Auto-Tobe (journal+commit)
-세 소스를 풀 방식으로 수집해 exaone3.5 cascade + pgvector RAG 로 합성한 주간 뉴스레터를 발송.
+세 소스를 풀 방식으로 수집해 exaone3.5 cascade + pgvector RAG 로 합성한 주간 뉴스레터를 생성·저장.
+**StandUp 은 메일을 직접 발송하지 않는다** (2026-09-21 발송 기능 제거) — 결과는 `/api/v1/insight/newsletters` 와
+대시보드로만 노출되며, 뉴스레터 발송은 AllergyInsight / SkillRadar 두 서비스만 담당한다.
 legacy 경로는 QA/Tobe Agent 데이터 수집만 `STANDUP_MODE` 로 병행 운영 (일/주/월 보고 자동 발송은 제거됨).
 
 상세: [docs/INSIGHT_NEWSLETTER.md](docs/INSIGHT_NEWSLETTER.md) ·
@@ -63,7 +65,7 @@ app/
 │   └── connectors/     # loganalyzer / github_qa / auto_tobe
 ├── rag/                # nomic-embed-text 임베딩 + pgvector store/retriever
 ├── synthesis/          # 3-stage cascade (summarize/analyze/compose)
-├── newsletter/         # builder (markdown→HTML) + sender (Gmail)
+├── newsletter/         # builder (markdown→HTML) — 메일 sender 는 제거됨
 ├── core/               # config, database, scheduler
 ├── models/             # SQLAlchemy (insight.py 추가)
 ├── schemas/

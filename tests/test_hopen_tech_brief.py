@@ -1,4 +1,4 @@
-"""hopen_tech_brief orchestrator + sender 채널 단위 테스트 (PR6).
+"""hopen_tech_brief orchestrator 단위 테스트 (PR6; 메일 발송 경로는 2026-09-21 제거).
 
 DB / LLM / IngestionHub / 메일 발송은 모킹 — 흐름·축약·렌더링 로직 검증.
 """
@@ -16,10 +16,6 @@ from app.agents_v2.hopen_tech_brief import (
     _window_range,
     render_hopen_tech_brief,
     run_daily,
-)
-from app.newsletter.sender import (
-    SendSummary,
-    list_hopen_tech_recipients,
 )
 from app.services.hopenvision_proposal_service import ProposalResult
 from app.synthesis.pipeline import TechTopic
@@ -200,20 +196,17 @@ def test_run_daily_skips_send_when_no_eligible_topics(monkeypatch):
     ), patch(
         "app.agents_v2.hopen_tech_brief.propose_from_tech_topics",
         return_value=proposals,
-    ), patch(
-        "app.agents_v2.hopen_tech_brief.send_hopen_tech_brief",
-    ) as mail_mock:
-        res = run_daily(dry_run=False)
+    ):
+        res = run_daily()
 
     assert res.skipped_reason == "no_eligible_topics"
     assert res.eligible == 0
     assert res.filtered_out == 1
     assert res.newsletter_id is None
-    mail_mock.assert_not_called()
 
 
-def test_run_daily_renders_and_sends_when_eligible(monkeypatch, tmp_path):
-    """통과 토픽 ≥1 이면 newsletter 저장 + 발송."""
+def test_run_daily_renders_and_saves_when_eligible(monkeypatch, tmp_path):
+    """통과 토픽 ≥1 이면 newsletter 저장 (메일 발송은 없음)."""
     proposals = [
         ProposalResult(
             proposal_id="p1", cluster_key="tech:spring",
@@ -243,8 +236,6 @@ def test_run_daily_renders_and_sends_when_eligible(monkeypatch, tmp_path):
 
     fake_session_factory = MagicMock(side_effect=lambda: FakeSession())
 
-    send_summary = SendSummary(total=1, success=1, failed=0, failures=[])
-
     with patch(
         "app.agents_v2.hopen_tech_brief.IngestionHub", fake_hub,
     ), patch(
@@ -258,17 +249,12 @@ def test_run_daily_renders_and_sends_when_eligible(monkeypatch, tmp_path):
     ), patch(
         "app.agents_v2.hopen_tech_brief.propose_from_tech_topics",
         return_value=proposals,
-    ), patch(
-        "app.agents_v2.hopen_tech_brief.send_hopen_tech_brief",
-        return_value=send_summary,
-    ) as mail_mock:
-        res = run_daily(dry_run=False)
+    ):
+        res = run_daily()
 
     assert res.eligible == 1
     assert res.filtered_out == 0
     assert res.newsletter_id == "nl-uuid-1"
-    assert res.send.success == 1
-    mail_mock.assert_called_once()
 
 
 def test_run_daily_skip_ingest_does_not_call_hub():
@@ -285,33 +271,11 @@ def test_run_daily_skip_ingest_does_not_call_hub():
         "app.agents_v2.hopen_tech_brief.propose_from_tech_topics",
         return_value=[],
     ):
-        res = run_daily(dry_run=True, skip_ingest=True)
+        res = run_daily(skip_ingest=True)
 
     fake_hub.assert_not_called()
     assert res.eligible == 0
     assert res.skipped_reason == "no_eligible_topics"
-
-
-# ── sender — hopen_tech 채널 ─────────────────────────────────────────────
-
-def test_list_hopen_tech_recipients_matches_pattern():
-    """`report_types` 가 'hopen_tech' / 'all' / 'insight,hopen_tech' 인 활성 사용자만."""
-    from app.models.recipient import Recipient
-
-    # SQLAlchemy session.execute 흐름을 모킹
-    session = MagicMock()
-    scalars_mock = MagicMock()
-    scalars_mock.all.return_value = ["a@x.com", "b@x.com"]
-    session.execute.return_value.scalars.return_value = scalars_mock
-
-    result = list_hopen_tech_recipients(session)
-    assert result == ["a@x.com", "b@x.com"]
-
-    # 실제 SQL 호출이 하나 발생했고, WHERE 조건에 'hopen_tech' 또는 'all' 이 포함
-    call = session.execute.call_args[0][0]
-    compiled = str(call.compile(compile_kwargs={"literal_binds": True}))
-    assert "hopen_tech" in compiled
-    assert "recipients.is_active" in compiled
 
 
 # ── weekly 축약 검증 (insight_newsletter 흐름 단편) ─────────────────────
@@ -333,8 +297,6 @@ def test_weekly_filters_tech_topics_with_stack_only_gate(monkeypatch):
     )
 
     fake_hub_result = MagicMock(per_connector={}, new_events=0, new_chunks=0)
-    fake_send = SendSummary(total=0, success=0, failed=0, failures=[])
-
     # weekly 흐름에서 외부 효과 모킹
     with patch.object(agent, "IngestionHub") as hub_cls, patch.object(
         agent, "synthesize", return_value=fake_syn,
@@ -345,8 +307,6 @@ def test_weekly_filters_tech_topics_with_stack_only_gate(monkeypatch):
     ), patch.object(
         agent, "SessionLocal",
     ) as session_cls, patch.object(
-        agent, "send_newsletter", return_value=fake_send,
-    ), patch.object(
         agent, "index_newsletter", return_value=0,
     ), patch.object(
         agent.settings, "tech_trend_auto_dev_plan", False,
@@ -369,7 +329,7 @@ def test_weekly_filters_tech_topics_with_stack_only_gate(monkeypatch):
         sess.get.return_value = nl_obj
         session_cls.return_value = sess
 
-        result = agent.run_weekly(dry_run=True)
+        result = agent.run_weekly()
 
     # Spring 만 남고 Unity 는 컷
     keywords = [t.keyword for t in result.synthesis.tech_topics]

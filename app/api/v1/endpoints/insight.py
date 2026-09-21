@@ -31,7 +31,6 @@ class IngestRunResponse(BaseModel):
 
 
 class WeeklyRunRequest(BaseModel):
-    dry_run: bool = False
     period_start: Optional[date] = None
     period_end: Optional[date] = None
 
@@ -42,8 +41,6 @@ class WeeklyRunResponse(BaseModel):
     period_end: date
     headline: str
     subject: str
-    sent: int
-    failed: int
     indexed_chunks: int
     stage_ms: dict
 
@@ -63,21 +60,19 @@ def trigger_ingest():
 
 @router.post("/weekly/run", response_model=WeeklyRunResponse)
 def trigger_weekly(req: WeeklyRunRequest):
-    """주간 뉴스레터 즉시 1회 실행 (수동 테스트용)."""
+    """주간 뉴스레터 즉시 1회 생성 (합성 → 저장 → RAG 색인, 메일 발송 없음)."""
     period = None
     if req.period_start and req.period_end:
         if req.period_start > req.period_end:
             raise HTTPException(400, "period_start > period_end")
         period = (req.period_start, req.period_end)
-    res = run_weekly(dry_run=req.dry_run, period=period)
+    res = run_weekly(period=period)
     return WeeklyRunResponse(
         newsletter_id=res.newsletter_id,
         period_start=res.period_start,
         period_end=res.period_end,
         headline=res.synthesis.headline,
         subject=f"(see newsletter id={res.newsletter_id})",
-        sent=res.send.success,
-        failed=res.send.failed,
         indexed_chunks=res.indexed_chunks,
         stage_ms={k: res.synthesis.meta.get(k) for k in
                   ("stage1_ms", "stage2_ms", "stage3_ms")},
@@ -161,7 +156,6 @@ def preview_newsletter(newsletter_id: str, db: Session = Depends(get_db)):
 # ── HopenTechBrief 일일 채널 (PR6) ───────────────────────────────────────
 
 class HopenBriefRunRequest(BaseModel):
-    dry_run: bool = False
     window_hours: Optional[int] = None
     skip_ingest: bool = False
     # PR10 — 운영자 수동 트리거 시 캐시·평가 범위 조정.
@@ -175,20 +169,17 @@ class HopenBriefRunResponse(BaseModel):
     window_hours: int
     eligible: int
     filtered_out: int
-    sent: int
-    failed: int
     skipped_reason: Optional[str] = None
 
 
 @router.post("/hopen-brief/run", response_model=HopenBriefRunResponse)
 def trigger_hopen_brief(req: HopenBriefRunRequest):
-    """HopenTechBrief 일일 1회 즉시 실행 (수동 트리거 / dry-run).
+    """HopenTechBrief 일일 1회 즉시 실행 (수동 트리거, 카드 생성·저장만 — 메일 발송 없음).
 
     `force_refresh=true` 면 토픽 캐시(`hopenvision_proposals`) 를 무시하고 LLM 재호출.
     `max_topics` 로 1회 평가 토픽 상한 조정 (기본 `HOPEN_BRIEF_MAX_PER_DAY=3`).
     """
     res = run_daily_hopen_tech(
-        dry_run=req.dry_run,
         window_hours=req.window_hours,
         skip_ingest=req.skip_ingest,
         force_refresh=req.force_refresh,
@@ -200,7 +191,5 @@ def trigger_hopen_brief(req: HopenBriefRunRequest):
         window_hours=res.window_hours,
         eligible=res.eligible,
         filtered_out=res.filtered_out,
-        sent=res.send.success if res.send else 0,
-        failed=res.send.failed if res.send else 0,
         skipped_reason=res.skipped_reason,
     )
