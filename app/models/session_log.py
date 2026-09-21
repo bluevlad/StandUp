@@ -6,7 +6,7 @@ Claude Code 세션 로그 모델 (회의록 표준)
 - session_pending: 미결사항 → work_items 승인 후 연결
 - session_commits: 세션 기간 동안 발생한 git 커밋 매핑
 
-표준 양식: Claude-Opus-bluevlad/standards/claude-code/SESSION_LOG_FORMAT.md
+표준 양식: Ai-Legacy-bluevlad/standards/claude-code/SESSION_LOG_FORMAT.md
 """
 
 import enum

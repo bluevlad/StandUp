@@ -33,8 +33,7 @@ jobs:
           TECH_TREND_KEYWORDS: ${{ vars.TECH_TREND_KEYWORDS }}
           HOPEN_BRIEF_DAILY_ENABLED: ${{ vars.HOPEN_BRIEF_DAILY_ENABLED }}
           HOPEN_BRIEF_FITNESS_THRESHOLD: ${{ vars.HOPEN_BRIEF_FITNESS_THRESHOLD }}
-          # Phase 1 — TechBriefing 흡수 전환 (vars 로 운영자 토글, 기본 병행 발송 유지)
-          INSIGHT_SEND_ENABLED: ${{ vars.INSIGHT_SEND_ENABLED }}
+          # Phase 1 — TechBriefing 흡수 전환 (StandUp 자체 메일 발송은 2026-09-21 제거)
           INSIGHT_WEEKLY_TECH_SECTION_ENABLED: ${{ vars.INSIGHT_WEEKLY_TECH_SECTION_ENABLED }}
           # Phase 2b — LLMOps 보고 (standup-weekly-newsletter consumer)
           LLMOPS_URL: ${{ vars.LLMOPS_URL }}
@@ -62,8 +61,7 @@ jobs:
           HOPEN_BRIEF_FITNESS_THRESHOLD=${HOPEN_BRIEF_FITNESS_THRESHOLD:-60}
 
           # ── TechBriefing 흡수 전환 (Phase 1) ────────────────────────────
-          # false 로 내리면 주간 합성·저장·색인 유지, 단독 메일 발송만 생략
-          INSIGHT_SEND_ENABLED=${INSIGHT_SEND_ENABLED:-true}
+          # 주간 합성·저장·색인만 수행 — 메일 발송은 TechBriefing 이 담당
           # 주간 "이번 주 기술 토픽" 섹션 — TechBriefing 이관, 기본 비활성
           INSIGHT_WEEKLY_TECH_SECTION_ENABLED=${INSIGHT_WEEKLY_TECH_SECTION_ENABLED:-false}
 

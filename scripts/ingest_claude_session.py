@@ -2,7 +2,7 @@
 Claude Code 세션 transcript → claude_sessions DB ingest CLI (얇은 래퍼)
 
 서비스 로직은 app/services/session_log_service.py 에 위치.
-표준: Claude-Opus-bluevlad/standards/claude-code/SESSION_LOG_FORMAT.md
+표준: Ai-Legacy-bluevlad/standards/claude-code/SESSION_LOG_FORMAT.md
 
 사용:
   python -m scripts.ingest_claude_session --session-id <UUID> --dry-run

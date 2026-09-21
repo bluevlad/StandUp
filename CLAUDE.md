@@ -8,11 +8,13 @@
 - Docker 명령은 현재 호스트에서 바로 실행 (별도 SSH 접속 불필요)
 - compose 파일 선택: Darwin → `docker-compose.yml` / Windows → `docker-compose.local.yml`
 
-> 3-머신 작업 환경(MacBook 편집·운영 / Desktop 터미널·AutoQA / Notebook TIPAIP2 격리) 규칙: [WORKSTATION_GUIDE.md](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/infrastructure/environments/WORKSTATION_GUIDE.md) — 개인 서비스 편집은 MacBook 에서만, Desktop 은 pull-only
+> 3-머신 작업 환경(MacBook 편집·운영 / Desktop 터미널·AutoQA / Notebook TIPAIP2 격리) 규칙: [WORKSTATION_GUIDE.md](https://github.com/bluevlad/Ai-Legacy-bluevlad/blob/main/infrastructure/environments/WORKSTATION_GUIDE.md) — 개인 서비스 편집은 MacBook 에서만, Desktop 은 pull-only
 
 ## Project Overview
 **Insight Newsletter (v2)** — LogAnalyzer / GitHub QA Issues / Auto-Tobe (journal+commit)
-세 소스를 풀 방식으로 수집해 exaone3.5 cascade + pgvector RAG 로 합성한 주간 뉴스레터를 발송.
+세 소스를 풀 방식으로 수집해 exaone3.5 cascade + pgvector RAG 로 합성한 주간 뉴스레터를 생성·저장.
+**StandUp 은 메일을 직접 발송하지 않는다** (2026-09-21 발송 기능 제거) — 결과는 `/api/v1/insight/newsletters` 와
+대시보드로만 노출되며, 뉴스레터 발송은 AllergyInsight / SkillRadar 두 서비스만 담당한다.
 legacy 경로는 QA/Tobe Agent 데이터 수집만 `STANDUP_MODE` 로 병행 운영 (일/주/월 보고 자동 발송은 제거됨).
 
 상세: [docs/INSIGHT_NEWSLETTER.md](docs/INSIGHT_NEWSLETTER.md) ·
@@ -63,7 +65,7 @@ app/
 │   └── connectors/     # loganalyzer / github_qa / auto_tobe
 ├── rag/                # nomic-embed-text 임베딩 + pgvector store/retriever
 ├── synthesis/          # 3-stage cascade (summarize/analyze/compose)
-├── newsletter/         # builder (markdown→HTML) + sender (Gmail)
+├── newsletter/         # builder (markdown→HTML) — 메일 sender 는 제거됨
 ├── core/               # config, database, scheduler
 ├── models/             # SQLAlchemy (insight.py 추가)
 ├── schemas/
@@ -74,8 +76,8 @@ app/
 
 ## Help Page 관리
 
-> 작성 표준: [HELP_PAGE_GUIDE.md](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/standards/documentation/HELP_PAGE_GUIDE.md)
-> HTML 템플릿: [help-page-template.html](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/standards/documentation/templates/help-page-template.html)
+> 작성 표준: [HELP_PAGE_GUIDE.md](https://github.com/bluevlad/Ai-Legacy-bluevlad/blob/main/standards/documentation/HELP_PAGE_GUIDE.md)
+> HTML 템플릿: [help-page-template.html](https://github.com/bluevlad/Ai-Legacy-bluevlad/blob/main/standards/documentation/templates/help-page-template.html)
 
 - **기능 추가/변경/삭제 시 반드시 헬프 페이지도 함께 업데이트**
 - 헬프 파일 위치: `app/static/help/`
@@ -99,7 +101,7 @@ app/
 
 ## Fix 커밋 오류 추적
 
-> 상세: [FIX_COMMIT_TRACKING_GUIDE.md](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/standards/git/FIX_COMMIT_TRACKING_GUIDE.md) | [ERROR_TAXONOMY.md](https://github.com/bluevlad/Claude-Opus-bluevlad/blob/main/standards/git/ERROR_TAXONOMY.md)
+> 상세: [FIX_COMMIT_TRACKING_GUIDE.md](https://github.com/bluevlad/Ai-Legacy-bluevlad/blob/main/standards/git/FIX_COMMIT_TRACKING_GUIDE.md) | [ERROR_TAXONOMY.md](https://github.com/bluevlad/Ai-Legacy-bluevlad/blob/main/standards/git/ERROR_TAXONOMY.md)
 
 `fix:` 커밋 시 footer에 오류 추적 메타데이터를 **필수** 포함합니다.
 

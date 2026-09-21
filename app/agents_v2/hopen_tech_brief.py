@@ -41,7 +41,6 @@ from ..models.insight import (
     IngestionEvent, Newsletter,
     SOURCE_MEDIUM_DIGEST_REPORT, SOURCE_TECH_NEWS_ARTICLE,
 )
-from ..newsletter.sender import SendSummary, send_hopen_tech_brief
 from ..services.hopenvision_proposal_service import (
     ProposalResult, propose_from_tech_topics,
 )
@@ -65,8 +64,6 @@ class DailyBriefResult:
     eligible: int
     filtered_out: int
     newsletter_id: Optional[str] = None
-    send: Optional[SendSummary] = None
-    dry_run: bool = False
     skipped_reason: Optional[str] = None  # "no_eligible_topics" 등
 
 
@@ -198,16 +195,14 @@ def render_hopen_tech_brief(
 
 def run_daily(
     *,
-    dry_run: bool = False,
     window_hours: Optional[int] = None,
     skip_ingest: bool = False,
     force_refresh: bool = False,
     max_topics: Optional[int] = None,
 ) -> DailyBriefResult:
-    """일일 HopenTechBrief 1회 실행.
+    """일일 HopenTechBrief 1회 실행 (카드 렌더 → DB 저장, 메일 발송 없음).
 
     Args:
-        dry_run: True 면 메일 발송 없음 (DB 행은 저장).
         window_hours: 최근 N시간. None 이면 settings.hopen_brief_window_hours.
         skip_ingest: True 면 IngestionHub 호출을 건너뛴다 (이미 다른 곳에서 돌린 경우).
         force_refresh: True 면 hopenvision_proposals 캐시 무시하고 LLM 재호출 (PR10).
@@ -216,8 +211,7 @@ def run_daily(
     """
     wh = window_hours if window_hours is not None else settings.hopen_brief_window_hours
     today_kst = now_kst().date()
-    logger.info("=== HopenTechBrief Daily 시작 %s (window=%dh, dry_run=%s) ===",
-                today_kst, wh, dry_run)
+    logger.info("=== HopenTechBrief Daily 시작 %s (window=%dh) ===", today_kst, wh)
 
     # 1) Ingestion (tech_trend connector 만 의미 있음, 다른 채널도 같은 hub 라 함께 실행)
     if not skip_ingest:
@@ -254,14 +248,14 @@ def run_daily(
     logger.info("daily 결과 — 통과=%d, 필터=%d (threshold=%d)",
                 eligible, filtered_out, settings.hopen_brief_fitness_threshold)
 
-    # 4) 통과 0건이면 발송·저장 skip — 빈 메일 보내지 않음
+    # 4) 통과 0건이면 저장 skip — 빈 브리프를 만들지 않음
     if eligible == 0:
-        logger.info("통과 토픽 없음 — 발송 skip")
+        logger.info("통과 토픽 없음 — 저장 skip")
         return DailyBriefResult(
             period_start=today_kst, period_end=today_kst,
             window_hours=wh, proposals=proposals,
             eligible=eligible, filtered_out=filtered_out,
-            dry_run=dry_run, skipped_reason="no_eligible_topics",
+            skipped_reason="no_eligible_topics",
         )
 
     # 5) 렌더 + 저장
@@ -296,26 +290,19 @@ def run_daily(
         session.commit()
         session.refresh(nl)
         nl_id = str(nl.id)
-
-    # 6) 발송 (hopen_tech 채널 수신자)
-    with SessionLocal() as session:
-        nl_to_send = session.get(Newsletter, nl_id)
-        if nl_to_send is None:
-            raise RuntimeError(f"hopen_tech newsletter {nl_id} missing")
-        send_result = send_hopen_tech_brief(nl_to_send, dry_run=dry_run)
-    logger.info("daily send: %s", send_result)
+    logger.info("daily brief 저장: newsletter=%s", nl_id)
 
     return DailyBriefResult(
         period_start=today_kst, period_end=today_kst,
         window_hours=wh, proposals=proposals,
         eligible=eligible, filtered_out=filtered_out,
-        newsletter_id=nl_id, send=send_result, dry_run=dry_run,
+        newsletter_id=nl_id,
     )
 
 
 def run_daily_job() -> None:
     """APScheduler wrapper — 예외 흡수."""
     try:
-        run_daily(dry_run=False)
+        run_daily()
     except Exception as e:  # noqa: BLE001
         logger.error("hopen_tech_brief daily 실패: %s", e, exc_info=True)

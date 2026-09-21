@@ -6,7 +6,10 @@ Insight-Newsletter Agent — 주간 orchestrator.
 2. synthesis.synthesize() — 3-stage cascade
 3. newsletter.builder.render_newsletter() — HTML 본문
 4. Newsletter row 저장 + RAG 색인
-5. newsletter.sender.send_newsletter() — 메일 발송
+
+StandUp 은 메일을 직접 발송하지 않는다 (2026-09-21 제거). 결과물은
+`/api/v1/insight/newsletters` API 와 대시보드로만 노출되며, 외부 뉴스레터
+(TechBriefing 등) 가 필요 시 pull 한다.
 """
 
 from __future__ import annotations
@@ -23,7 +26,6 @@ from ..core.database import SessionLocal
 from ..ingestion.hub import HubResult, IngestionHub
 from ..models.insight import Newsletter
 from ..newsletter.builder import render_newsletter
-from ..newsletter.sender import SendSummary, send_newsletter
 from ..rag.store import index_newsletter
 from ..synthesis.pipeline import SynthesisOutput, synthesize
 
@@ -37,7 +39,6 @@ class WeeklyRunResult:
     hub: HubResult
     synthesis: SynthesisOutput
     newsletter_id: str
-    send: SendSummary
     indexed_chunks: int
     tech_topic_proposals: list = field(default_factory=list)
 
@@ -53,11 +54,10 @@ def _last_week_window() -> tuple[date, date]:
     return last_monday, last_sunday
 
 
-def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = None) -> WeeklyRunResult:
-    """주간 뉴스레터 1회 실행."""
+def run_weekly(*, period: Optional[tuple[date, date]] = None) -> WeeklyRunResult:
+    """주간 뉴스레터 1회 실행 (합성 → 저장 → RAG 색인, 발송 없음)."""
     period_start, period_end = period or _last_week_window()
-    logger.info("=== Insight Weekly 시작 %s ~ %s (dry_run=%s) ===",
-                period_start, period_end, dry_run)
+    logger.info("=== Insight Weekly 시작 %s ~ %s ===", period_start, period_end)
 
     # 1. Ingestion
     hub = IngestionHub(embed_chunks=True)
@@ -116,7 +116,7 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
         session.refresh(nl)
         nl_id = str(nl.id)
 
-        # RAG 색인 — 발송 여부와 무관하게 자기참조 학습 가능하도록
+        # RAG 색인 — 다음 호 작성 시 자기참조 비교용
         try:
             indexed = index_newsletter(session, nl)
             session.commit()
@@ -124,22 +124,8 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
             logger.warning("뉴스레터 RAG 색인 실패: %s", e)
             session.rollback()
 
-    # 5. Send (dry_run 이면 발송 X)
-    #    INSIGHT_SEND_ENABLED=false — TechBriefing 흡수 전환: 합성·저장·색인은
-    #    유지하되 단독 메일 발송만 생략 (TechBriefing 이 API 로 pull).
-    effective_dry_run = dry_run or not settings.insight_send_enabled
-    if effective_dry_run and not dry_run:
-        logger.info("INSIGHT_SEND_ENABLED=false — 단독 발송 생략 (newsletter=%s)", nl_id)
-    send_result: SendSummary
-    with SessionLocal() as session:
-        nl_to_send = session.get(Newsletter, nl_id)
-        if nl_to_send is None:
-            raise RuntimeError(f"newsletter {nl_id} 가 사라짐")
-        send_result = send_newsletter(nl_to_send, dry_run=effective_dry_run)
-    logger.info("send 완료: %s", send_result)
-
-    # 6. tech_topics → HopenVision 제안 (+ DevPlan 자동 초안화)
-    #    LLM 호출이라 발송 이후로 미루고, 실패해도 주간 흐름은 막지 않는다.
+    # 5. tech_topics → HopenVision 제안 (+ DevPlan 자동 초안화)
+    #    LLM 호출이라 저장·색인 이후로 미루고, 실패해도 주간 흐름은 막지 않는다.
     tech_proposals: list = []
     if syn.tech_topics:
         try:
@@ -174,7 +160,6 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
         hub=hub_result,
         synthesis=syn,
         newsletter_id=nl_id,
-        send=send_result,
         indexed_chunks=indexed,
         tech_topic_proposals=tech_proposals,
     )
@@ -183,6 +168,6 @@ def run_weekly(*, dry_run: bool = False, period: Optional[tuple[date, date]] = N
 def run_weekly_job() -> None:
     """APScheduler 가 호출하는 wrapper — 예외 흡수."""
     try:
-        run_weekly(dry_run=False)
+        run_weekly()
     except Exception as e:  # noqa: BLE001
         logger.error("insight weekly 실패: %s", e, exc_info=True)

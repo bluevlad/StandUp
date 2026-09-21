@@ -147,11 +147,10 @@ class Settings(BaseSettings):
     insight_window_days: int = Field(default=7, env="INSIGHT_WINDOW_DAYS")
     insight_subject_prefix: str = Field(default="[StandUp Insight]", env="INSIGHT_SUBJECT_PREFIX")
 
-    # ── TechBriefing 흡수 전환 (Phase 1) ──────────────────────────────────
-    # false 면 주간 합성·저장·RAG 색인은 그대로 수행하되 메일 발송만 생략.
-    # TechBriefing(NewsLetterPlatform) 이 /api/v1/insight/newsletters 를 pull 해
-    # 섹션으로 게재하는 체제로 전환 완료 시 false 로 내린다.
-    insight_send_enabled: bool = Field(default=True, env="INSIGHT_SEND_ENABLED")
+    # ── TechBriefing 흡수 전환 ────────────────────────────────────────────
+    # StandUp 은 뉴스레터 메일을 직접 발송하지 않는다 (2026-09-21 제거).
+    # 주간 합성·저장·RAG 색인 결과는 /api/v1/insight/newsletters 로 노출되고
+    # TechBriefing(NewsLetterPlatform) 이 pull 해 섹션으로 게재한다.
     # 주간 뉴스레터의 "이번 주 기술 토픽" 섹션 — 기술 토픽 큐레이션은
     # TechBriefing 담당으로 이관되어 기본 비활성. tech_topics 수집·HopenVision
     # 제안 파이프라인은 이 플래그와 무관하게 계속 동작한다.

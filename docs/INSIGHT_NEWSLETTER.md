@@ -19,11 +19,12 @@
                   │ Stage 3: exaone3.5:7.8b   (한국어 본문)  │
                   └──────────────────────────────────────────┘
                                       ↓
-                            Newsletter (HTML, KPI, RAG refs)
+                            Newsletter (HTML, KPI, RAG refs) → DB 저장
                                       ↓
-                  Email (Gmail SMTP) → recipients (report_types LIKE '%insight%')
+                  corpus_newsletters 자기참조 색인
                                       ↓
-                  발송본 corpus_newsletters 자기참조 색인
+                  /api/v1/insight/newsletters (TechBriefing 등 외부 pull) + 대시보드
+                  ※ StandUp 자체 메일 발송은 2026-09-21 제거
 ```
 
 ## 핵심 설계 결정
@@ -49,7 +50,7 @@
 - `corpus_qa` — QA 이슈 본문 + 해결 댓글
 - `corpus_logs` — LogAnalyzer 패턴
 - `corpus_fixes` — Auto-Tobe journal + commit
-- `corpus_newsletters` — 발송된 뉴스레터 (자기참조 학습용)
+- `corpus_newsletters` — 생성된 뉴스레터 (자기참조 학습용)
 
 ### 4) 원본 추적
 모든 청크가 `event_id` 로 `ingestion_events` 를 참조 → 어느 본문 한 줄이든 원본 URL 까지 도달 가능.
@@ -73,18 +74,11 @@ CREATE EXTENSION IF NOT EXISTS vector;
 curl -X POST http://localhost:9065/api/v1/insight/ingest/run
 ```
 
-주간 발송 (실제 발송):
+주간 뉴스레터 즉시 생성 (합성 → DB 저장 → RAG 색인, 메일 발송 없음):
 ```bash
 curl -X POST http://localhost:9065/api/v1/insight/weekly/run \
   -H "Content-Type: application/json" \
-  -d '{"dry_run": false}'
-```
-
-dry-run (수신자 발송 X, DB 만 기록):
-```bash
-curl -X POST http://localhost:9065/api/v1/insight/weekly/run \
-  -H "Content-Type: application/json" \
-  -d '{"dry_run": true}'
+  -d '{}'
 ```
 
 뉴스레터 미리보기 (HTML):
@@ -97,19 +91,14 @@ curl http://localhost:9065/api/v1/insight/newsletters/{id}/preview
 curl 'http://localhost:9065/api/v1/insight/events?days=7&source_type=loganalyzer'
 ```
 
-### 수신자 추가
-```sql
-INSERT INTO recipients (name, email, report_types, is_active)
-VALUES ('홍길동', 'a@b.com', 'insight', true);
-```
-또는 기존 수신자에 추가:
-```sql
-UPDATE recipients SET report_types = 'all,insight' WHERE email = 'a@b.com';
-```
+### 발송 (제거됨)
+StandUp 은 2026-09-21 부로 뉴스레터 메일을 직접 발송하지 않는다. `recipients` 테이블의
+`insight` / `hopen_tech` 채널은 더 이상 참조되지 않으며, 생성된 뉴스레터는
+`GET /api/v1/insight/newsletters` 로 외부(TechBriefing) 가 pull 하거나 대시보드에서 열람한다.
 
 ## 디버깅
 
-LLM 호출 실패 시: synthesis 가 raw 데이터로 fallback 본문 생성 → 발송은 계속 진행.
+LLM 호출 실패 시: synthesis 가 raw 데이터로 fallback 본문 생성 → 저장·색인은 계속 진행.
 임베딩 실패 시: 청크는 저장되지만 embedding 컬럼 NULL → 다음 ingestion 사이클에서 재시도.
 
 `synthesis_meta.stage{1,2,3}_ms` 로 단계별 시간 측정 가능. 합성 한 번에 보통 30~120초 (M5 24GB 기준).
@@ -233,9 +222,9 @@ Insight Newsletter 와 다음과 같이 분리되어 공존한다.
 | 윈도우 | 최근 7일 | 최근 24h (env 조정) |
 | 합성 | exaone3.5 cascade 풀세트 | tech_topics 추출만 |
 | tech 게이트 | 스택 매칭만 (≥25, 무관 토픽 컷) | 스택+LLM 합산 (≥60, 깊이있게) |
-| 메일 채널 | `report_types LIKE '%insight%'` | `report_types LIKE '%hopen_tech%'` |
+| 출력 | `newsletters` 행 + API/대시보드 (메일 없음) | `newsletters` 행 (`channel='hopen_tech'`, 메일 없음) |
 | 토픽 깊이 | 키워드 + 디지스트 hint | + Mermaid + 사례 + PoC 힌트 |
-| 빈 결과 시 | 항상 발송 | 통과 0건이면 발송 skip |
+| 빈 결과 시 | 항상 생성 | 통과 0건이면 저장 skip |
 
 ```
 [CRON 09:00 KST]
@@ -256,34 +245,19 @@ send_hopen_tech_brief (hopen_tech 채널 수신자)
 | Key | 기본값 | 설명 |
 |-----|--------|------|
 | `HOPEN_BRIEF_DAILY_ENABLED` | `false` | 일일 cron 활성화 |
-| `HOPEN_BRIEF_DAILY_HOUR` / `_MINUTE` | `9` / `0` | KST 발송 시각 |
+| `HOPEN_BRIEF_DAILY_HOUR` / `_MINUTE` | `9` / `0` | KST 실행 시각 |
 | `HOPEN_BRIEF_WINDOW_HOURS` | `24` | 윈도우 시간 |
 | `HOPEN_BRIEF_MAX_PER_DAY` | `3` | 카드로 표현할 최대 토픽 수 (LLM·fetch 비용 가드) |
-| `HOPEN_BRIEF_SUBJECT_PREFIX` | `[HopenTechBrief]` | 메일 제목 prefix |
+| `HOPEN_BRIEF_SUBJECT_PREFIX` | `[HopenTechBrief]` | 브리프 제목 prefix |
 | `WEEKLY_TECH_STACK_MIN_SCORE` | `25` | 주간 newsletter tech 섹션 게이트 (스택만) |
 
 수동 트리거:
 
 ```bash
-# 실제 발송
+# 카드 생성 + DB 저장 (메일 발송 없음)
 curl -X POST http://localhost:9065/api/v1/insight/hopen-brief/run \
   -H "Content-Type: application/json" \
-  -d '{"dry_run": false}'
-
-# dry-run (DB 행은 저장, 메일 미발송)
-curl -X POST http://localhost:9065/api/v1/insight/hopen-brief/run \
-  -H "Content-Type: application/json" \
-  -d '{"dry_run": true, "window_hours": 48}'
-```
-
-수신자 등록:
-
-```sql
-INSERT INTO recipients (name, email, report_types, is_active)
-VALUES ('홍길동', 'a@b.com', 'hopen_tech', true);
-
--- 기존 수신자에 추가
-UPDATE recipients SET report_types = 'insight,hopen_tech' WHERE email = 'a@b.com';
+  -d '{"window_hours": 48}'
 ```
 
 운영 메모:

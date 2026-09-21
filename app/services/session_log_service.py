@@ -4,7 +4,7 @@ Claude 세션 로그 서비스
 - 회의 내용/미결사항 추출
 - 미결사항 승인 → work_items 등록
 
-표준: Claude-Opus-bluevlad/standards/claude-code/SESSION_LOG_FORMAT.md
+표준: Ai-Legacy-bluevlad/standards/claude-code/SESSION_LOG_FORMAT.md
 """
 
 import json
@@ -32,7 +32,7 @@ PENDING_KEYWORDS = ("TODO", "todo", "미결", "나중에", "이후", "다음에"
 TARGET_PROJECTS = [
     "hopenvision", "AllergyInsight", "NewsLetterPlatform",
     "unmong-main", "StandUp", "Autonomous-QA-Agent", "Auto-Tobe-Agent",
-    "Claude-Opus-bluevlad", "InfraWatcher", "QA-Dashboard", "CompanyAnalyzer",
+    "Ai-Legacy-bluevlad", "InfraWatcher", "QA-Dashboard", "CompanyAnalyzer",
     "LogAnalyzer", "OpsConsole",
 ]
 

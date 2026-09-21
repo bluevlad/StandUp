@@ -166,11 +166,7 @@
         </div>
         <div class="ins-meta-row">
             <span>이벤트 {{ c.source_count }}건</span>
-            {% if c.sent_at %}
-            <span class="sent">발송 {{ c.sent_at.strftime('%m-%d %H:%M') }}</span>
-            {% else %}
-            <span class="pending">미발송</span>
-            {% endif %}
+            <span class="sent">생성 {{ c.created_at.strftime('%m-%d %H:%M') }}</span>
         </div>
     </div>
     {% endfor %}
@@ -180,7 +176,7 @@
     {% if current_severity != 'all' %}
     선택한 severity({{ current_severity }})에 해당하는 뉴스레터가 없습니다.
     {% else %}
-    아직 발송된 뉴스레터가 없습니다. <code>POST /api/v1/insight/weekly/run</code> 으로 즉시 생성할 수 있습니다.
+    아직 생성된 뉴스레터가 없습니다. <code>POST /api/v1/insight/weekly/run</code> 으로 즉시 생성할 수 있습니다.
     {% endif %}
 </div>
 {% endif %}
