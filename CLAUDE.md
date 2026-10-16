@@ -37,7 +37,7 @@ legacy 경로는 QA/Tobe Agent 데이터 수집만 `STANDUP_MODE` 로 병행 운
 - Template: Jinja2
 - GitHub API: PyGithub
 - Config: pydantic-settings + python-dotenv
-- LLM: **Ollama (host)** — `exaone3.5:7.8b` / `qwen2.5-coder:14b` / `gemma4:12b-mlx` / `nomic-embed-text`
+- LLM: **Ollama (host)** — `gemma4:12b-mlx`(요약·분석 JSON) / `exaone3.5:7.8b`(뉴스레터·회의록 한국어 작성) / `nomic-embed-text`(임베딩)
 
 ## Build and Run
 ```bash

@@ -1,5 +1,5 @@
 """
-Claude 세션 transcript → LLM 요약 (Ollama qwen2.5:7b 기본).
+Claude 세션 transcript → LLM 요약 (Ollama exaone3.5:7.8b 기본).
 실패 시 None 반환 → 호출자가 rule-based fallback 으로 대체.
 """
 
@@ -14,7 +14,7 @@ from .session_masker import mask
 
 logger = logging.getLogger(__name__)
 
-MAX_INPUT_CHARS = 12000  # qwen2.5:7b context 안전 영역
+MAX_INPUT_CHARS = 12000  # 7~8B 모델 context 안전 영역
 MAX_USER_MSG_PER_SESSION = 8
 MAX_TOOL_NAMES = 30
 

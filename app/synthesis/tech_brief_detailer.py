@@ -3,7 +3,7 @@
 게이트(`tech_topic_filter.evaluate_topic`) 를 통과한 토픽에 대해 *상세 산출물* 을
 생성한다. 세 가지 신호를 한 번에 묶어 반환:
 
-1. **Mermaid 다이어그램** — As-Is / To-Be 흐름. `qwen2.5-coder` 로 생성.
+1. **Mermaid 다이어그램** — As-Is / To-Be 흐름. `ollama_model_analyze`(gemma4) 로 생성.
    파서 가능한 ```mermaid``` 블록을 추출, 실패 시 None.
 2. **적용 사례 (case_studies)** — TechTopic.news_articles 각 URL 에서 og:image/canonical
    메타만 추출(`article_image_extractor`). 이메일에 카드로 표현 가능한 dict 리스트.
@@ -175,6 +175,7 @@ def generate_diagram(
         user=prompt,
         temperature=0.2,
         max_tokens=800,
+        think=False,
     )
     if not gen.ok:
         return "", settings.ollama_model_analyze, gen.eval_duration_ms
@@ -285,6 +286,7 @@ def generate_code_hints(
         user=prompt,
         temperature=0.2,
         max_tokens=900,
+        think=False,
     )
     if not gen.ok:
         return [], settings.ollama_model_analyze, gen.eval_duration_ms
