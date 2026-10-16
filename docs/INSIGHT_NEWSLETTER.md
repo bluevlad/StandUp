@@ -15,7 +15,7 @@
                                       ↓
                   ┌──────  Synthesis 3-stage cascade  ──────┐
                   │ Stage 1: gemma4:12b-mlx   (요약)         │
-                  │ Stage 2: qwen2.5-coder:14b (분석/JSON)   │
+                  │ Stage 2: gemma4:12b-mlx (분석/JSON)      │
                   │ Stage 3: exaone3.5:7.8b   (한국어 본문)  │
                   └──────────────────────────────────────────┘
                                       ↓
@@ -41,7 +41,7 @@
 | Stage | 모델 | 역할 | 메모리 |
 |---|---|---|---|
 | 1 | `gemma4:12b-mlx` | 청크 요약 (think:false) | 7GB |
-| 2 | `qwen2.5-coder:14b` | 인사이트/패턴 추출 (JSON 출력) | 9GB |
+| 2 | `gemma4:12b-mlx` | 인사이트/패턴 추출 (JSON 출력, think=false) | stage 1 과 공유 |
 | 3 | `exaone3.5:7.8b` | 최종 한국어 본문 작성 | 5GB |
 | Embed | `nomic-embed-text` | 768-dim 임베딩 | 0.3GB |
 
@@ -157,7 +157,7 @@ PR4 부터는 토픽 → 제안 사이에 **HopenVision 적합도 게이트**가
 ```
 TechTopic (키워드+디지스트+뉴스)
    ↓ stack 키워드 매칭 (0~60점, 결정적)
-   ↓ LLM 분류 (0~40점, 모델=qwen2.5-coder)
+   ↓ LLM 분류 (0~40점, 모델=gemma4:12b-mlx)
    ↓ score >= HOPEN_BRIEF_FITNESS_THRESHOLD ?
    ├─ Yes → HopenVisionProposalService 로 진입, repo index 와 fitness 결과를
    │         프롬프트에 동봉. proposal 행에 fitness_score/impact_area/effort_hours 저장.
@@ -181,7 +181,7 @@ candidate_modules 를 제안하게 한다.
 
 운영 메모:
 - 1회 실행에 LLM 호출이 (토픽당 게이트 1회 + 제안 1회) 발생 — 게이트 모델은
-  `OLLAMA_MODEL_ANALYZE` (기본 qwen2.5-coder:14b), 제안 모델은 `OLLAMA_MODEL_COMPOSE`.
+  `OLLAMA_MODEL_ANALYZE` (기본 gemma4:12b-mlx), 제안 모델은 `OLLAMA_MODEL_COMPOSE`.
   스택 매칭이 0 인 토픽은 게이트 LLM 호출도 skip 되므로 비용 가드.
 - `HopenVisionProposal.fitness_score / impact_area / effort_hours` 컬럼이 추가됨
   — 대시보드에서 "참고 보관" 탭 / 제안 정렬에 활용 (PR5 에서 UI 노출).

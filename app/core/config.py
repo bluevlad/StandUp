@@ -48,7 +48,8 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="http://host.docker.internal:11434", env="OLLAMA_BASE_URL")
     # 2026-08-13 llama3.2:3b → gemma4:12b-mlx 전환 (LLMOps label_match 평가에서 llama 열세 → 설치 제거)
     ollama_model_summarize: str = Field(default="gemma4:12b-mlx", env="OLLAMA_MODEL_SUMMARIZE")
-    ollama_model_analyze: str = Field(default="qwen2.5-coder:14b", env="OLLAMA_MODEL_ANALYZE")
+    # 2026-10-16 qwen2.5 퇴출 — 운영 모델 gemma4(구조화 JSON) / exaone3.5(한국어 서술) 2종으로 분배
+    ollama_model_analyze: str = Field(default="gemma4:12b-mlx", env="OLLAMA_MODEL_ANALYZE")
     ollama_model_compose: str = Field(default="exaone3.5:7.8b", env="OLLAMA_MODEL_COMPOSE")
     ollama_model_embed: str = Field(default="nomic-embed-text", env="OLLAMA_MODEL_EMBED")
     ollama_embed_dim: int = Field(default=768, env="OLLAMA_EMBED_DIM")
@@ -56,7 +57,7 @@ class Settings(BaseSettings):
 
     # Claude 세션 회의록 — LLM 요약 (Phase 3)
     session_log_llm_enabled: bool = Field(default=True, env="SESSION_LOG_LLM_ENABLED")
-    session_log_summary_model: str = Field(default="qwen2.5:7b", env="SESSION_LOG_SUMMARY_MODEL")
+    session_log_summary_model: str = Field(default="exaone3.5:7.8b", env="SESSION_LOG_SUMMARY_MODEL")
     session_log_llm_timeout_sec: int = Field(default=120, env="SESSION_LOG_LLM_TIMEOUT_SEC")
 
     # Insight 스케줄 (월요일 09:00)

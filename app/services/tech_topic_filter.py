@@ -228,6 +228,7 @@ def evaluate_topic(
             user=prompt,
             temperature=0.1,
             max_tokens=400,
+            think=False,
         )
         model = settings.ollama_model_analyze
         eval_ms = gen.eval_duration_ms

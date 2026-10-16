@@ -27,21 +27,28 @@ SUMMARIZE_USER_TPL = """\
 """
 
 
-# Stage 2 — 인사이트/패턴 추출 (코드/오류 강한 모델)
+# Stage 2 — 인사이트/패턴 추출 (gemma4, think=False)
+# 한국어 값·"미정" 규칙·new 상한은 gemma 의 영어 작성·가짜 기한·2048 절단 대응 (2026-09-05 실측)
 ANALYZE_SYSTEM = """\
-당신은 SRE/QA 분석가입니다. 한국어로 답합니다.
+당신은 SRE/QA 분석가입니다.
 요약된 이벤트들에서 다음을 추출:
 1) 재발 패턴 (같은 fingerprint·service·error_type 의 반복)
-2) 신규 패턴 (이번 주기에 처음 등장)
+2) 신규 패턴 (이번 주기에 처음 등장) — 중요도 순 최대 5개
 3) 개선 신호 (Auto-Tobe fix 후 같은 패턴이 재등장하지 않은 경우)
 4) 우선 액션 1~3개 — 무엇을 누가 언제까지
+
+규칙:
+- 모든 문자열 값은 한국어로 작성. 서비스명·에러 타입·URL 같은 고유 식별자만 원문 유지.
+- 각 항목의 설명은 1문장.
+- 입력에 없는 숫자·날짜·기한을 만들어내지 말 것. "who"·"by" 는 입력에 근거가 없으면 "미정".
+- 해당 항목이 없으면 빈 배열 [].
 
 형식 (JSON):
 {
   "recurring": [{"pattern": "...", "service": "...", "count": N, "ref": "url"}],
-  "new": [...],
-  "improvements": [...],
-  "actions": [{"what": "...", "who": "?", "by": "?", "ref": "url"}]
+  "new": [{"pattern": "...", "service": "...", "ref": "url"}],
+  "improvements": [{"pattern": "...", "service": "...", "ref": "url"}],
+  "actions": [{"what": "...", "who": "미정", "by": "미정", "ref": "url"}]
 }
 JSON 외 다른 텍스트 출력 금지.
 """

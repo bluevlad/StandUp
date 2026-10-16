@@ -196,6 +196,7 @@ def _stage2_analyze(summaries: list[str], kpis: dict) -> dict:
         user=user,
         temperature=0.2,
         max_tokens=2048,
+        think=False,
     )
     if not result.ok or not result.text:
         return {"recurring": [], "new": [], "improvements": [], "actions": [],
